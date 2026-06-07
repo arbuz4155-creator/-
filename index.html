@@ -14,6 +14,7 @@
             --msg-bg: #0084ff;
             --msg-text: #ffffff;
             --reply-bg: rgba(0,0,0,0.05);
+            --online: #4caf50;
         }
         .dark {
             --bg: #1a1a2e;
@@ -28,40 +29,29 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
+        body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
         .screen { display: none; flex-direction: column; height: 100vh; }
         .screen.active { display: flex; }
 
-        /* ВХОД */
         #login-screen { justify-content: center; align-items: center; background: #0084ff; }
         #login-screen .box { background: white; padding: 30px; border-radius: 15px; text-align: center; width: 85%; max-width: 350px; }
         #login-screen h1 { margin-bottom: 20px; color: #333; }
         #login-screen input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
         #login-screen button { width: 100%; padding: 12px; margin-top: 10px; background: #0084ff; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; }
 
-        /* ШАПКА */
         .header { background: var(--primary); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
         .header button { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
 
-        /* СПИСОК ЧАТОВ */
         #chats-list { flex: 1; overflow-y: auto; padding: 10px; }
         .chat-item { background: var(--surface); padding: 15px; border-radius: 10px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
         .chat-item .icon { font-size: 30px; }
         .chat-item .name { font-weight: bold; }
+        .online-dot { width: 8px; height: 8px; background: var(--online); border-radius: 50%; margin-left: auto; }
 
         #chat-actions { display: flex; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); gap: 10px; }
         #chat-actions input { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--bg); color: var(--text); }
         #chat-actions button { padding: 12px 15px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 13px; }
 
-        /* ПРОФИЛЬ */
         #profile-screen .content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 30px; background: var(--bg); }
         #avatar-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; background: #ddd; margin-bottom: 15px; }
         #profile-screen input[type="text"] { padding: 10px; font-size: 16px; margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; width: 80%; background: var(--surface); color: var(--text); }
@@ -74,22 +64,31 @@
         .toggle::after { content: ''; width: 22px; height: 22px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.2s; }
         .toggle.active::after { left: 26px; }
 
-        /* ЧАТ */
         #messages { flex: 1; padding: 10px; overflow-y: auto; }
-        .message-row { display: flex; gap: 8px; align-items: flex-end; margin: 5px 0; cursor: pointer; }
+        .message-row { display: flex; gap: 8px; align-items: flex-end; margin: 5px 0; cursor: pointer; position: relative; }
         .message-row .msg-avatar { width: 25px; height: 25px; border-radius: 50%; object-fit: cover; background: #ddd; flex-shrink: 0; }
         .message { background: var(--msg-bg); color: var(--msg-text); padding: 10px 15px; border-radius: 20px; max-width: 70%; word-wrap: break-word; }
         .message .sender { font-size: 11px; opacity: 0.7; margin-bottom: 3px; }
         .message .reply-preview { font-size: 11px; background: var(--reply-bg); padding: 4px 8px; border-radius: 8px; margin-bottom: 5px; border-left: 3px solid rgba(255,255,255,0.4); }
         .message img { max-width: 200px; border-radius: 10px; margin-top: 5px; }
+        .voice-msg { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+        .voice-msg button { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 20px; font-size: 16px; }
+        .voice-msg .duration { font-size: 13px; opacity: 0.8; }
+        .delete-btn { position: absolute; top: 5px; right: 5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: none; }
+        .message-row:hover .delete-btn { display: block; }
         .reply-bar { display: flex; padding: 8px 15px; background: var(--surface); border-top: 1px solid var(--border); gap: 10px; align-items: center; }
         .reply-bar .reply-text { flex: 1; font-size: 12px; color: var(--sub); }
         .reply-bar button { background: none; border: none; color: red; font-size: 18px; cursor: pointer; }
-        .input-area { display: flex; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); gap: 10px; }
+        .input-area { display: flex; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); gap: 10px; align-items: center; }
         .input-area input { flex: 1; padding: 12px 15px; font-size: 16px; border: 1px solid var(--border); border-radius: 25px; outline: none; background: var(--bg); color: var(--text); }
         .input-area button { padding: 12px 25px; font-size: 16px; background: var(--primary); color: white; border: none; border-radius: 25px; font-weight: bold; }
-        .input-area .attach-btn { padding: 12px 15px; font-size: 20px; background: none; border: none; cursor: pointer; }
+        .input-area .attach-btn, .input-area .mic-btn { padding: 12px 15px; font-size: 20px; background: none; border: none; cursor: pointer; }
+        .mic-btn.recording { color: red; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         #photo-input { display: none; }
+        .recording-indicator { text-align: center; padding: 5px; color: red; font-weight: bold; display: none; }
+        .recording-indicator.active { display: block; }
+        .online-list { padding: 10px; font-size: 12px; color: var(--sub); }
     </style>
 </head>
 <body>
@@ -121,7 +120,9 @@
             <span id="chat-room-title">Чат</span>
             <span></span>
         </div>
+        <div class="online-list" id="online-list"></div>
         <div id="messages"></div>
+        <div class="recording-indicator" id="rec-indicator">🎤 Запись...</div>
         <div id="reply-bar" class="reply-bar" style="display:none;">
             <span class="reply-text" id="reply-text"></span>
             <button id="cancel-reply-btn">✕</button>
@@ -129,6 +130,7 @@
         <div class="input-area">
             <button class="attach-btn" id="attach-btn">📎</button>
             <input type="file" id="photo-input" accept="image/*">
+            <button class="mic-btn" id="mic-btn">🎤</button>
             <input type="text" id="msg-input" placeholder="Сообщение...">
             <button id="send-btn">Отправить</button>
         </div>
@@ -173,11 +175,11 @@
         let currentUser = null;
         let currentChatId = null;
         let replyTo = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordStartTime = null;
 
-        // ТЁМНАЯ ТЕМА
-        if (localStorage.getItem('dark') === 'true') {
-            document.body.classList.add('dark');
-        }
+        if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
         document.getElementById('theme-toggle').onclick = function() {
             document.body.classList.toggle('dark');
             localStorage.setItem('dark', document.body.classList.contains('dark'));
@@ -185,18 +187,39 @@
         };
         document.getElementById('theme-toggle').classList.toggle('active', document.body.classList.contains('dark'));
 
-        // ВХОД
         let savedUser = localStorage.getItem('currentUser');
-        if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            showScreen('chats-screen');
-        }
+        if (savedUser) { currentUser = JSON.parse(savedUser); showScreen('chats-screen'); }
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             if (id === 'chats-screen') loadChats();
             if (id === 'profile-screen') loadProfile();
+            if (id === 'chat-room-screen') { updateOnlineStatus(); loadOnlineUsers(); }
+        }
+
+        // ОНЛАЙН
+        function updateOnlineStatus() {
+            if (!currentUser || !currentChatId) return;
+            let presenceRef = database.ref('presence/' + currentChatId + '/' + currentUser.nick);
+            presenceRef.set({ online: true, lastSeen: Date.now() });
+            presenceRef.onDisconnect().set({ online: false, lastSeen: Date.now() });
+        }
+
+        function loadOnlineUsers() {
+            if (!currentChatId) return;
+            database.ref('presence/' + currentChatId).on('value', snapshot => {
+                let list = document.getElementById('online-list');
+                list.innerHTML = '';
+                if (!snapshot.exists()) return;
+                let online = [];
+                snapshot.forEach(child => {
+                    if (child.val().online) online.push(child.key);
+                });
+                if (online.length > 0) {
+                    list.innerHTML = '🟢 Онлайн: ' + online.join(', ');
+                }
+            });
         }
 
         document.getElementById('login-btn').onclick = function() {
@@ -220,6 +243,9 @@
         };
 
         document.getElementById('logout-btn').onclick = function() {
+            if (currentUser && currentChatId) {
+                database.ref('presence/' + currentChatId + '/' + currentUser.nick).set({ online: false, lastSeen: Date.now() });
+            }
             currentUser = null;
             localStorage.removeItem('currentUser');
             showScreen('login-screen');
@@ -227,7 +253,13 @@
 
         document.getElementById('to-profile-btn').onclick = () => showScreen('profile-screen');
         document.getElementById('profile-back-btn').onclick = () => showScreen('chats-screen');
-        document.getElementById('back-btn').onclick = () => showScreen('chats-screen');
+        document.getElementById('back-btn').onclick = () => {
+            if (currentChatId && currentUser) {
+                database.ref('presence/' + currentChatId + '/' + currentUser.nick).set({ online: false, lastSeen: Date.now() });
+            }
+            currentChatId = null;
+            showScreen('chats-screen');
+        };
 
         function loadProfile() {
             if (!currentUser) return;
@@ -307,31 +339,59 @@
             msgDiv.innerHTML = '';
             database.ref('messages/' + chatId).off();
             database.ref('messages/' + chatId).on('child_added', function(data) {
-                let msg = data.val();
-                let row = document.createElement('div');
-                row.classList.add('message-row');
-                row.setAttribute('data-id', data.key);
-
-                let html = '<img class="msg-avatar" src="' + (msg.avatar || '') + '" alt=""><div class="message">';
-                if (msg.replyTo) {
-                    html += '<div class="reply-preview">↪ ' + (msg.replySender || '') + ': ' + (msg.replyText || '') + '</div>';
-                }
-                html += '<span class="sender">' + (msg.sender || 'Аноним') + '</span><br>' + (msg.text || '');
-                if (msg.photo) {
-                    html += '<br><img src="' + msg.photo + '" onclick="openImage(\'' + msg.photo + '\')">';
-                }
-                html += '</div>';
-
-                row.innerHTML = html;
-                row.onclick = function() {
-                    replyTo = { id: data.key, text: msg.text || 'Фото', sender: msg.sender, photo: msg.photo };
-                    document.getElementById('reply-text').textContent = '↩ ' + msg.sender + ': ' + (msg.text || 'Фото');
-                    document.getElementById('reply-bar').style.display = 'flex';
-                };
-                msgDiv.appendChild(row);
-                msgDiv.scrollTop = msgDiv.scrollHeight;
+                displayMessage(data.key, data.val(), msgDiv);
             });
         }
+
+        function displayMessage(key, msg, container) {
+            let row = document.createElement('div');
+            row.classList.add('message-row');
+            row.setAttribute('data-id', key);
+
+            let isMine = currentUser && msg.sender === currentUser.nick;
+            let html = '<img class="msg-avatar" src="' + (msg.avatar || '') + '" alt=""><div class="message">';
+            if (msg.replyTo) {
+                html += '<div class="reply-preview">↪ ' + (msg.replySender || '') + ': ' + (msg.replyText || '') + '</div>';
+            }
+            html += '<span class="sender">' + (msg.sender || 'Аноним') + '</span><br>';
+            if (msg.voice) {
+                html += '<div class="voice-msg"><button onclick="playVoice(\'' + msg.voice + '\')">▶️</button><span class="duration">' + (msg.duration || '?') + 'с</span></div>';
+            } else {
+                html += (msg.text || '');
+            }
+            if (msg.photo) {
+                html += '<br><img src="' + msg.photo + '" onclick="openImage(\'' + msg.photo + '\')">';
+            }
+            html += '</div>';
+
+            if (isMine) {
+                html += '<button class="delete-btn" onclick="deleteMessage(\'' + key + '\')">✕</button>';
+            }
+
+            row.innerHTML = html;
+            row.onclick = function(e) {
+                if (e.target.classList.contains('delete-btn')) return;
+                replyTo = { id: key, text: msg.text || (msg.voice ? 'Голосовое' : 'Фото'), sender: msg.sender };
+                document.getElementById('reply-text').textContent = '↩ ' + msg.sender + ': ' + (msg.text || (msg.voice ? 'Голосовое' : 'Фото'));
+                document.getElementById('reply-bar').style.display = 'flex';
+            };
+            container.appendChild(row);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        window.deleteMessage = function(key) {
+            if (!currentChatId || !currentUser) return;
+            if (confirm('Удалить сообщение?')) {
+                database.ref('messages/' + currentChatId + '/' + key).remove();
+                let el = document.querySelector('[data-id="' + key + '"]');
+                if (el) el.remove();
+            }
+        };
+
+        window.playVoice = function(base64) {
+            let audio = new Audio(base64);
+            audio.play();
+        };
 
         window.openImage = function(src) {
             let win = window.open('', '_blank');
@@ -343,18 +403,15 @@
             document.getElementById('reply-bar').style.display = 'none';
         };
 
-        document.getElementById('attach-btn').onclick = function() {
-            document.getElementById('photo-input').click();
-        };
+        document.getElementById('attach-btn').onclick = () => document.getElementById('photo-input').click();
 
         document.getElementById('photo-input').onchange = function() {
             let file = this.files[0];
             if (!file) return;
             let reader = new FileReader();
             reader.onload = function(e) {
-                let photo = e.target.result;
                 let msgData = {
-                    photo: photo,
+                    photo: e.target.result,
                     text: '',
                     sender: currentUser.nick,
                     avatar: currentUser.avatar || '',
@@ -362,7 +419,7 @@
                 };
                 if (replyTo) {
                     msgData.replyTo = replyTo.id;
-                    msgData.replyText = replyTo.text || 'Фото';
+                    msgData.replyText = 'Фото';
                     msgData.replySender = replyTo.sender;
                     replyTo = null;
                     document.getElementById('reply-bar').style.display = 'none';
@@ -372,6 +429,50 @@
             reader.readAsDataURL(file);
             this.value = '';
         };
+
+        document.getElementById('mic-btn').onmousedown = function() {
+            if (!navigator.mediaDevices) { alert('Микрофон не работает'); return; }
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                recordStartTime = Date.now();
+                document.getElementById('rec-indicator').classList.add('active');
+                document.getElementById('mic-btn').classList.add('recording');
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = function() {
+                    document.getElementById('rec-indicator').classList.remove('active');
+                    document.getElementById('mic-btn').classList.remove('recording');
+                    let blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    let reader = new FileReader();
+                    reader.onload = function(e) {
+                        let msgData = {
+                            voice: e.target.result,
+                            duration: Math.round((Date.now() - recordStartTime) / 1000),
+                            text: '',
+                            sender: currentUser.nick,
+                            avatar: currentUser.avatar || '',
+                            time: Date.now()
+                        };
+                        if (replyTo) {
+                            msgData.replyTo = replyTo.id;
+                            msgData.replyText = 'Голосовое';
+                            msgData.replySender = replyTo.sender;
+                            replyTo = null;
+                            document.getElementById('reply-bar').style.display = 'none';
+                        }
+                        database.ref('messages/' + currentChatId).push(msgData);
+                    };
+                    reader.readAsDataURL(blob);
+                };
+                mediaRecorder.start();
+            }).catch(() => alert('Нет доступа к микрофону'));
+        };
+
+        document.getElementById('mic-btn').onmouseup = function() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        };
+        document.getElementById('mic-btn').ontouchstart = document.getElementById('mic-btn').onmousedown;
+        document.getElementById('mic-btn').ontouchend = document.getElementById('mic-btn').onmouseup;
 
         document.getElementById('send-btn').onclick = function() {
             let text = document.getElementById('msg-input').value.trim();
@@ -384,7 +485,7 @@
             };
             if (replyTo) {
                 msgData.replyTo = replyTo.id;
-                msgData.replyText = replyTo.text || 'Фото';
+                msgData.replyText = replyTo.text || '';
                 msgData.replySender = replyTo.sender;
                 replyTo = null;
                 document.getElementById('reply-bar').style.display = 'none';
@@ -394,4 +495,4 @@
         };
     </script>
 </body>
-    </html>
+</html>
