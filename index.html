@@ -47,13 +47,12 @@
         .chat-item { background: var(--surface); padding: 15px; border-radius: 10px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
         .chat-item .icon { font-size: 30px; }
         .chat-item .name { font-weight: bold; }
-        .chat-item .online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--online); margin-left: auto; }
 
         #chat-actions { display: flex; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); gap: 10px; }
         #chat-actions input { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--bg); color: var(--text); }
         #chat-actions button { padding: 12px 15px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 13px; }
 
-        #profile-screen .content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 30px; background: var(--bg); }
+        #profile-screen .content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 30px; background: var(--bg); overflow-y: auto; }
         #avatar-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; background: #ddd; margin-bottom: 15px; }
         #profile-screen input[type="text"] { padding: 10px; font-size: 16px; margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; width: 80%; background: var(--surface); color: var(--text); }
         #profile-screen button { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 10px; margin: 5px; }
@@ -175,7 +174,7 @@
         <div class="modal-content">
             <h3>🔍 Найти человека</h3>
             <input type="text" id="modal-search-input" placeholder="@username...">
-            <button onclick="searchUser()" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:10px;">Найти</button>
+            <button onclick="searchUser()" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:10px;margin-bottom:10px;">Найти</button>
             <div id="search-results"></div>
             <button class="modal-close" onclick="closeSearch()">Закрыть</button>
         </div>
@@ -199,7 +198,6 @@
 
         let currentUser = null;
         let currentChatId = null;
-        let currentChatPartner = null;
         let replyTo = null;
         let mediaRecorder = null;
         let audioChunks = [];
@@ -241,29 +239,20 @@
                 snapshot.forEach(child => {
                     if (child.val().online && child.key !== (currentUser ? currentUser.nick : '')) online.push(child.key);
                 });
-                if (online.length > 0) list.innerHTML = '🟢 Онлайн';
-                else list.innerHTML = '⚫ Офлайн';
+                list.innerHTML = online.length > 0 ? '🟢 Онлайн' : '⚫ Офлайн';
             });
         }
 
-        // ЮЗЕРНЕЙМЫ
-        function saveUsername(username) {
-            return database.ref('usernames/' + username).set(currentUser.nick);
-        }
-
         document.getElementById('save-username-btn').onclick = function() {
-            let username = document.getElementById('new-username').value.trim().replace('@', '');
+            let username = document.getElementById('new-username').value.trim().replace('@', '').toLowerCase();
             if (!username) return;
-            if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-                alert('Только буквы, цифры и _ (3-20 символов)');
-                return;
-            }
+            if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) { alert('Только буквы, цифры и _ (3-20 символов)'); return; }
             database.ref('usernames/' + username).once('value').then(s => {
                 if (s.exists() && s.val() !== currentUser.nick) {
                     alert('Этот @username занят');
                 } else {
                     if (currentUser.username) database.ref('usernames/' + currentUser.username).remove();
-                    saveUsername(username);
+                    database.ref('usernames/' + username).set(currentUser.nick);
                     currentUser.username = username;
                     database.ref('users/' + currentUser.nick).update({ username: username });
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -273,7 +262,6 @@
             });
         };
 
-        // ПОИСК
         window.searchUser = function() {
             let q = document.getElementById('modal-search-input').value.trim().replace('@', '').toLowerCase();
             let results = document.getElementById('search-results');
@@ -303,12 +291,8 @@
                 name: partnerNick,
                 type: 'private',
                 user1: currentUser.nick,
-                user2: partnerNick,
-                username1: currentUser.username || '',
-                username2: partnerUsername || ''
+                user2: partnerNick
             });
-            currentChatPartner = partnerNick;
-            document.getElementById('new-chat-name').value = '';
             openChat(chatId, partnerNick);
         }
 
@@ -357,7 +341,6 @@
                 database.ref('presence/' + currentChatId + '/' + currentUser.nick).set({ online: false, lastSeen: Date.now() });
             }
             currentChatId = null;
-            currentChatPartner = null;
             showScreen('chats-screen');
         };
 
@@ -379,9 +362,7 @@
                 let data = s.val();
                 database.ref('users/' + newNick).set({ pass: data.pass, avatar: data.avatar || '', username: data.username || '' });
                 database.ref('users/' + currentUser.nick).remove();
-                if (data.username) {
-                    database.ref('usernames/' + data.username).set(newNick);
-                }
+                if (data.username) database.ref('usernames/' + data.username).set(newNick);
                 currentUser.nick = newNick;
                 localStorage.setItem('currentUser', JSON.stringify(currentUser));
                 alert('Ник изменён!');
@@ -420,7 +401,7 @@
                         let div = document.createElement('div');
                         div.classList.add('chat-item');
                         div.innerHTML = '<span class="icon">👤</span><span class="name">' + partner + '</span>';
-                        div.onclick = () => { currentChatPartner = partner; openChat(child.key, partner); };
+                        div.onclick = () => openChat(child.key, partner);
                         list.appendChild(div);
                     }
                 });
@@ -542,4 +523,4 @@
         };
     </script>
 </body>
-                </html>
+    </html>
