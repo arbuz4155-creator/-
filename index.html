@@ -47,6 +47,7 @@
         .chat-item { background: var(--surface); padding: 15px; border-radius: 10px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
         .chat-item .icon { font-size: 30px; }
         .chat-item .name { font-weight: bold; }
+        .chat-item .online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--online); margin-left: auto; }
 
         #chat-actions { display: flex; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); gap: 10px; }
         #chat-actions input { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--bg); color: var(--text); }
@@ -91,15 +92,14 @@
         .recording-indicator.active { display: block; }
         .online-list { padding: 8px 15px; font-size: 12px; color: var(--sub); background: var(--surface); border-bottom: 1px solid var(--border); }
 
-        /* МОДАЛКА УЧАСТНИКОВ */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--surface); padding: 20px; border-radius: 15px; width: 85%; max-width: 350px; max-height: 60%; overflow-y: auto; }
-        .modal-content h3 { margin-bottom: 15px; text-align: center; color: var(--text); }
-        .participant { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid var(--border); color: var(--text); }
-        .participant .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-        .participant .dot.online { background: var(--online); }
+        .modal-content { background: var(--surface); padding: 20px; border-radius: 15px; width: 85%; max-width: 350px; max-height: 60%; overflow-y: auto; color: var(--text); }
+        .modal-content h3 { margin-bottom: 15px; text-align: center; }
+        .modal-content input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; margin-bottom: 10px; background: var(--bg); color: var(--text); }
         .modal-close { display: block; margin: 15px auto 0; padding: 10px 30px; background: var(--primary); color: white; border: none; border-radius: 10px; }
+        .search-result { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .search-result:hover { background: var(--reply-bg); }
     </style>
 </head>
 <body>
@@ -120,15 +120,15 @@
         </div>
         <div id="chats-list">Загрузка...</div>
         <div id="chat-actions">
-            <input type="text" id="new-chat-name" placeholder="Название чата...">
-            <button id="join-chat-btn">Войти</button>
+            <input type="text" id="search-user-input" placeholder="Поиск по @username...">
+            <button id="search-user-btn">🔍</button>
         </div>
     </div>
 
     <div id="chat-room-screen" class="screen">
         <div class="header">
             <button id="back-btn">← Назад</button>
-            <span class="chat-title" id="chat-room-title" onclick="showParticipants()">Чат</span>
+            <span class="chat-title" id="chat-room-title">Чат</span>
             <span></span>
         </div>
         <div class="online-list" id="online-list"></div>
@@ -158,6 +158,9 @@
             <input type="file" id="avatar-file" accept="image/*">
             <p style="font-size:12px;color:var(--sub);">Нажми на аватар чтобы сменить</p>
             <p id="profile-nick" style="font-weight:bold;font-size:18px;"></p>
+            <p id="profile-username" style="color:var(--sub);font-size:14px;"></p>
+            <input type="text" id="new-username" placeholder="@username">
+            <button id="save-username-btn">Сохранить @username</button>
             <input type="text" id="new-nick" placeholder="Новый никнейм">
             <button id="save-nick-btn">Сохранить ник</button>
             <div class="setting-row">
@@ -167,12 +170,14 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА УЧАСТНИКОВ -->
-    <div class="modal" id="participants-modal">
+    <!-- МОДАЛКА ПОИСКА -->
+    <div class="modal" id="search-modal">
         <div class="modal-content">
-            <h3>👥 Участники чата</h3>
-            <div id="participants-list"></div>
-            <button class="modal-close" onclick="closeParticipants()">Закрыть</button>
+            <h3>🔍 Найти человека</h3>
+            <input type="text" id="modal-search-input" placeholder="@username...">
+            <button onclick="searchUser()" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:10px;">Найти</button>
+            <div id="search-results"></div>
+            <button class="modal-close" onclick="closeSearch()">Закрыть</button>
         </div>
     </div>
 
@@ -194,11 +199,11 @@
 
         let currentUser = null;
         let currentChatId = null;
+        let currentChatPartner = null;
         let replyTo = null;
         let mediaRecorder = null;
         let audioChunks = [];
         let recordStartTime = null;
-        let allParticipants = {};
 
         if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
         document.getElementById('theme-toggle').onclick = function() {
@@ -216,7 +221,7 @@
             document.getElementById(id).classList.add('active');
             if (id === 'chats-screen') loadChats();
             if (id === 'profile-screen') loadProfile();
-            if (id === 'chat-room-screen') { updateOnlineStatus(); loadOnlineUsers(); loadAllParticipants(); }
+            if (id === 'chat-room-screen') { updateOnlineStatus(); loadOnlineUsers(); }
         }
 
         function updateOnlineStatus() {
@@ -234,43 +239,86 @@
                 if (!snapshot.exists()) return;
                 let online = [];
                 snapshot.forEach(child => {
-                    if (child.val().online) online.push(child.key);
+                    if (child.val().online && child.key !== (currentUser ? currentUser.nick : '')) online.push(child.key);
                 });
-                if (online.length > 0) list.innerHTML = '🟢 Онлайн: ' + online.join(', ');
+                if (online.length > 0) list.innerHTML = '🟢 Онлайн';
+                else list.innerHTML = '⚫ Офлайн';
             });
         }
 
-        function loadAllParticipants() {
-            if (!currentChatId) return;
-            database.ref('presence/' + currentChatId).on('value', snapshot => {
-                allParticipants = {};
-                if (snapshot.exists()) {
-                    snapshot.forEach(child => {
-                        allParticipants[child.key] = child.val().online || false;
-                    });
-                }
-            });
+        // ЮЗЕРНЕЙМЫ
+        function saveUsername(username) {
+            return database.ref('usernames/' + username).set(currentUser.nick);
         }
 
-        window.showParticipants = function() {
-            let modal = document.getElementById('participants-modal');
-            let list = document.getElementById('participants-list');
-            list.innerHTML = '';
-            if (Object.keys(allParticipants).length === 0) {
-                list.innerHTML = '<p style="text-align:center;color:var(--sub);">Пока никто не заходил</p>';
-            } else {
-                for (let nick in allParticipants) {
-                    let div = document.createElement('div');
-                    div.classList.add('participant');
-                    div.innerHTML = '<span class="dot ' + (allParticipants[nick] ? 'online' : '') + '"></span>' + nick + (nick === (currentUser ? currentUser.nick : '') ? ' (вы)' : '');
-                    list.appendChild(div);
-                }
+        document.getElementById('save-username-btn').onclick = function() {
+            let username = document.getElementById('new-username').value.trim().replace('@', '');
+            if (!username) return;
+            if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+                alert('Только буквы, цифры и _ (3-20 символов)');
+                return;
             }
-            modal.classList.add('active');
+            database.ref('usernames/' + username).once('value').then(s => {
+                if (s.exists() && s.val() !== currentUser.nick) {
+                    alert('Этот @username занят');
+                } else {
+                    if (currentUser.username) database.ref('usernames/' + currentUser.username).remove();
+                    saveUsername(username);
+                    currentUser.username = username;
+                    database.ref('users/' + currentUser.nick).update({ username: username });
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    loadProfile();
+                    alert('@username сохранён!');
+                }
+            });
         };
 
-        window.closeParticipants = function() {
-            document.getElementById('participants-modal').classList.remove('active');
+        // ПОИСК
+        window.searchUser = function() {
+            let q = document.getElementById('modal-search-input').value.trim().replace('@', '').toLowerCase();
+            let results = document.getElementById('search-results');
+            results.innerHTML = '';
+            if (!q) return;
+            database.ref('usernames/' + q).once('value').then(s => {
+                if (s.exists()) {
+                    let nick = s.val();
+                    if (nick === (currentUser ? currentUser.nick : '')) {
+                        results.innerHTML = '<p style="text-align:center;color:var(--sub);">Это вы</p>';
+                        return;
+                    }
+                    let div = document.createElement('div');
+                    div.classList.add('search-result');
+                    div.innerHTML = '<span>👤</span><span>@' + q + ' (' + nick + ')</span>';
+                    div.onclick = function() { startPrivateChat(nick, q); closeSearch(); };
+                    results.appendChild(div);
+                } else {
+                    results.innerHTML = '<p style="text-align:center;color:var(--sub);">Не найдено</p>';
+                }
+            });
+        };
+
+        function startPrivateChat(partnerNick, partnerUsername) {
+            let chatId = [currentUser.nick, partnerNick].sort().join('_');
+            database.ref('chats/' + chatId).set({
+                name: partnerNick,
+                type: 'private',
+                user1: currentUser.nick,
+                user2: partnerNick,
+                username1: currentUser.username || '',
+                username2: partnerUsername || ''
+            });
+            currentChatPartner = partnerNick;
+            document.getElementById('new-chat-name').value = '';
+            openChat(chatId, partnerNick);
+        }
+
+        window.openSearch = function() {
+            document.getElementById('search-modal').classList.add('active');
+            document.getElementById('modal-search-input').value = '';
+            document.getElementById('search-results').innerHTML = '';
+        };
+        window.closeSearch = function() {
+            document.getElementById('search-modal').classList.remove('active');
         };
 
         document.getElementById('login-btn').onclick = function() {
@@ -280,13 +328,13 @@
             database.ref('users/' + nick).once('value').then(snapshot => {
                 if (snapshot.exists()) {
                     if (snapshot.val().pass === pass) {
-                        currentUser = { nick: nick, pass: pass, avatar: snapshot.val().avatar || '' };
+                        currentUser = { nick: nick, pass: pass, avatar: snapshot.val().avatar || '', username: snapshot.val().username || '' };
                         localStorage.setItem('currentUser', JSON.stringify(currentUser));
                         showScreen('chats-screen');
                     } else { alert('Неверный пароль'); }
                 } else {
-                    database.ref('users/' + nick).set({ pass: pass, avatar: '' });
-                    currentUser = { nick: nick, pass: pass, avatar: '' };
+                    database.ref('users/' + nick).set({ pass: pass, avatar: '', username: '' });
+                    currentUser = { nick: nick, pass: pass, avatar: '', username: '' };
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     showScreen('chats-screen');
                 }
@@ -309,13 +357,18 @@
                 database.ref('presence/' + currentChatId + '/' + currentUser.nick).set({ online: false, lastSeen: Date.now() });
             }
             currentChatId = null;
+            currentChatPartner = null;
             showScreen('chats-screen');
         };
+
+        document.getElementById('search-user-btn').onclick = openSearch;
 
         function loadProfile() {
             if (!currentUser) return;
             document.getElementById('profile-nick').textContent = currentUser.nick;
+            document.getElementById('profile-username').textContent = currentUser.username ? '@' + currentUser.username : '@не задан';
             document.getElementById('new-nick').value = currentUser.nick;
+            document.getElementById('new-username').value = currentUser.username || '';
             document.getElementById('avatar-img').src = currentUser.avatar || '';
         }
 
@@ -324,8 +377,11 @@
             if (!newNick || newNick === currentUser.nick) return;
             database.ref('users/' + currentUser.nick).once('value').then(s => {
                 let data = s.val();
-                database.ref('users/' + newNick).set({ pass: data.pass, avatar: data.avatar || '' });
+                database.ref('users/' + newNick).set({ pass: data.pass, avatar: data.avatar || '', username: data.username || '' });
                 database.ref('users/' + currentUser.nick).remove();
+                if (data.username) {
+                    database.ref('usernames/' + data.username).set(newNick);
+                }
                 currentUser.nick = newNick;
                 localStorage.setItem('currentUser', JSON.stringify(currentUser));
                 alert('Ник изменён!');
@@ -352,28 +408,25 @@
                 let list = document.getElementById('chats-list');
                 list.innerHTML = '';
                 if (!snapshot.exists()) {
-                    list.innerHTML = '<p style="color:var(--sub);text-align:center;padding:20px;">Нет чатов. Создай первый!</p>';
+                    list.innerHTML = '<p style="color:var(--sub);text-align:center;padding:20px;">Нет чатов. Найди друга через поиск 🔍</p>';
                     return;
                 }
+                let found = false;
                 snapshot.forEach(child => {
                     let chat = child.val();
-                    let div = document.createElement('div');
-                    div.classList.add('chat-item');
-                    div.innerHTML = '<span class="icon">💬</span><span class="name">' + chat.name + '</span>';
-                    div.onclick = () => openChat(child.key, chat.name);
-                    list.appendChild(div);
+                    if (chat.type === 'private' && (chat.user1 === (currentUser ? currentUser.nick : '') || chat.user2 === (currentUser ? currentUser.nick : ''))) {
+                        found = true;
+                        let partner = chat.user1 === (currentUser ? currentUser.nick : '') ? chat.user2 : chat.user1;
+                        let div = document.createElement('div');
+                        div.classList.add('chat-item');
+                        div.innerHTML = '<span class="icon">👤</span><span class="name">' + partner + '</span>';
+                        div.onclick = () => { currentChatPartner = partner; openChat(child.key, partner); };
+                        list.appendChild(div);
+                    }
                 });
+                if (!found) list.innerHTML = '<p style="color:var(--sub);text-align:center;padding:20px;">Нет чатов. Найди друга через поиск 🔍</p>';
             });
         }
-
-        document.getElementById('join-chat-btn').onclick = function() {
-            let name = document.getElementById('new-chat-name').value.trim();
-            if (!name) return;
-            let chatId = name.replace(/\s+/g, '-').toLowerCase();
-            database.ref('chats/' + chatId).set({ name: name });
-            document.getElementById('new-chat-name').value = '';
-            openChat(chatId, name);
-        };
 
         function openChat(chatId, chatName) {
             currentChatId = chatId;
@@ -403,28 +456,15 @@
             let row = document.createElement('div');
             row.classList.add('message-row');
             row.setAttribute('data-id', key);
-
             let isMine = currentUser && msg.sender === currentUser.nick;
             let html = '<img class="msg-avatar" src="' + (msg.avatar || '') + '" alt=""><div class="message">';
-            if (msg.replyTo) {
-                html += '<div class="reply-preview">↪ ' + (msg.replySender || '') + ': ' + (msg.replyText || '') + '</div>';
-            }
+            if (msg.replyTo) html += '<div class="reply-preview">↪ ' + (msg.replySender || '') + ': ' + (msg.replyText || '') + '</div>';
             html += '<span class="sender">' + (msg.sender || 'Аноним') + '</span><br>';
-            if (msg.voice) {
-                html += '<div class="voice-msg"><button onclick="playVoice(\'' + msg.voice + '\')">▶️</button><span class="duration">' + (msg.duration || '?') + 'с</span></div>';
-            } else {
-                html += (msg.text || '');
-            }
-            if (msg.photo) {
-                html += '<br><img src="' + msg.photo + '" onclick="openImage(\'' + msg.photo + '\')">';
-            }
-            html += '<div class="time">' + formatTime(msg.time || Date.now()) + '</div>';
-            html += '</div>';
-
-            if (isMine) {
-                html += '<button class="delete-btn" onclick="deleteMessage(\'' + key + '\')">✕</button>';
-            }
-
+            if (msg.voice) html += '<div class="voice-msg"><button onclick="playVoice(\'' + msg.voice + '\')">▶️</button><span class="duration">' + (msg.duration || '?') + 'с</span></div>';
+            else html += (msg.text || '');
+            if (msg.photo) html += '<br><img src="' + msg.photo + '" onclick="openImage(\'' + msg.photo + '\')">';
+            html += '<div class="time">' + formatTime(msg.time || Date.now()) + '</div></div>';
+            if (isMine) html += '<button class="delete-btn" onclick="deleteMessage(\'' + key + '\')">✕</button>';
             row.innerHTML = html;
             row.onclick = function(e) {
                 if (e.target.classList.contains('delete-btn') || e.target.tagName === 'BUTTON') return;
@@ -445,21 +485,10 @@
             }
         };
 
-        window.playVoice = function(base64) {
-            let audio = new Audio(base64);
-            audio.play();
-        };
+        window.playVoice = function(b64) { let a = new Audio(b64); a.play(); };
+        window.openImage = function(src) { let w = window.open('', '_blank'); w.document.write('<img src="' + src + '" style="max-width:100%;" onclick="window.close()">'); };
 
-        window.openImage = function(src) {
-            let win = window.open('', '_blank');
-            win.document.write('<img src="' + src + '" style="max-width:100%;cursor:zoom-out;" onclick="window.close()">');
-        };
-
-        document.getElementById('cancel-reply-btn').onclick = function() {
-            replyTo = null;
-            document.getElementById('reply-bar').style.display = 'none';
-        };
-
+        document.getElementById('cancel-reply-btn').onclick = function() { replyTo = null; document.getElementById('reply-bar').style.display = 'none'; };
         document.getElementById('attach-btn').onclick = () => document.getElementById('photo-input').click();
 
         document.getElementById('photo-input').onchange = function() {
@@ -467,20 +496,8 @@
             if (!file) return;
             let reader = new FileReader();
             reader.onload = function(e) {
-                let msgData = {
-                    photo: e.target.result,
-                    text: '',
-                    sender: currentUser.nick,
-                    avatar: currentUser.avatar || '',
-                    time: Date.now()
-                };
-                if (replyTo) {
-                    msgData.replyTo = replyTo.id;
-                    msgData.replyText = 'Фото';
-                    msgData.replySender = replyTo.sender;
-                    replyTo = null;
-                    document.getElementById('reply-bar').style.display = 'none';
-                }
+                let msgData = { photo: e.target.result, text: '', sender: currentUser.nick, avatar: currentUser.avatar || '', time: Date.now() };
+                if (replyTo) { msgData.replyTo = replyTo.id; msgData.replyText = 'Фото'; msgData.replySender = replyTo.sender; replyTo = null; document.getElementById('reply-bar').style.display = 'none'; }
                 database.ref('messages/' + currentChatId).push(msgData);
             };
             reader.readAsDataURL(file);
@@ -502,21 +519,8 @@
                     let blob = new Blob(audioChunks, { type: 'audio/webm' });
                     let reader = new FileReader();
                     reader.onload = function(e) {
-                        let msgData = {
-                            voice: e.target.result,
-                            duration: Math.round((Date.now() - recordStartTime) / 1000),
-                            text: '',
-                            sender: currentUser.nick,
-                            avatar: currentUser.avatar || '',
-                            time: Date.now()
-                        };
-                        if (replyTo) {
-                            msgData.replyTo = replyTo.id;
-                            msgData.replyText = 'Голосовое';
-                            msgData.replySender = replyTo.sender;
-                            replyTo = null;
-                            document.getElementById('reply-bar').style.display = 'none';
-                        }
+                        let msgData = { voice: e.target.result, duration: Math.round((Date.now() - recordStartTime) / 1000), text: '', sender: currentUser.nick, avatar: currentUser.avatar || '', time: Date.now() };
+                        if (replyTo) { msgData.replyTo = replyTo.id; msgData.replyText = 'Голосовое'; msgData.replySender = replyTo.sender; replyTo = null; document.getElementById('reply-bar').style.display = 'none'; }
                         database.ref('messages/' + currentChatId).push(msgData);
                     };
                     reader.readAsDataURL(blob);
@@ -524,32 +528,18 @@
                 mediaRecorder.start();
             }).catch(() => alert('Нет доступа к микрофону'));
         };
-
-        document.getElementById('mic-btn').onmouseup = function() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-        };
+        document.getElementById('mic-btn').onmouseup = function() { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); };
         document.getElementById('mic-btn').ontouchstart = document.getElementById('mic-btn').onmousedown;
         document.getElementById('mic-btn').ontouchend = document.getElementById('mic-btn').onmouseup;
 
         document.getElementById('send-btn').onclick = function() {
             let text = document.getElementById('msg-input').value.trim();
             if (!text || !currentUser || !currentChatId) return;
-            let msgData = {
-                text: text,
-                sender: currentUser.nick,
-                avatar: currentUser.avatar || '',
-                time: Date.now()
-            };
-            if (replyTo) {
-                msgData.replyTo = replyTo.id;
-                msgData.replyText = replyTo.text || '';
-                msgData.replySender = replyTo.sender;
-                replyTo = null;
-                document.getElementById('reply-bar').style.display = 'none';
-            }
+            let msgData = { text: text, sender: currentUser.nick, avatar: currentUser.avatar || '', time: Date.now() };
+            if (replyTo) { msgData.replyTo = replyTo.id; msgData.replyText = replyTo.text || ''; msgData.replySender = replyTo.sender; replyTo = null; document.getElementById('reply-bar').style.display = 'none'; }
             database.ref('messages/' + currentChatId).push(msgData);
             document.getElementById('msg-input').value = '';
         };
     </script>
 </body>
-    </html>
+                </html>
