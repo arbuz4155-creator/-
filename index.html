@@ -431,17 +431,20 @@
         };
         window.closeEditUsername = () => document.getElementById('edit-username-modal').classList.remove('active');
         window.saveUsernameFromModal = function() {
-            let username = document.getElementById('edit-username-input').value.trim().replace('@','').toLowerCase();
-            if (!username || !/^[a-zA-Z0-9_]{3,20}$/.test(username)) { alert('3-20 символов, буквы/цифры/_'); return; }
-            database.ref('usernames/' + username).once('value').then(s => {
-                if (s.exists() && s.val() !== currentUser.nick) { alert('Занят'); return; }
-                if (currentUser.username) database.ref('usernames/' + currentUser.username).remove();
-                database.ref('usernames/' + username).set(currentUser.nick);
-                currentUser.username = username;
-                database.ref('users/' + currentUser.nick).update({ username });
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                loadProfile(); closeEditUsername();
-            });
+    let username = document.getElementById('edit-username-input').value.trim().replace('@','').toLowerCase();
+    if (!username) { alert('Введи @username'); return; }
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) { alert('Только буквы, цифры и _ (3-20 символов)'); return; }
+    database.ref('usernames/' + username).once('value').then(s => {
+        if (s.exists() && s.val() !== currentUser.nick) { alert('Этот @username занят'); return; }
+        if (currentUser.username) database.ref('usernames/' + currentUser.username).remove();
+        database.ref('usernames/' + username).set(currentUser.nick);
+        currentUser.username = username;
+        database.ref('users/' + currentUser.nick).update({ username: username });
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        loadProfile(); closeEditUsername();
+        alert('@' + username + ' сохранён!');
+    }).catch(err => { alert('Ошибка: ' + err.message); });
+};
         };
 
         document.getElementById('avatar-file').onchange = function() {
