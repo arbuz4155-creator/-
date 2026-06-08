@@ -53,6 +53,8 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .subscriber-item .badge{background:#ff9800;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:8px}
 .subscriber-item button{background:#f44336;color:#fff;border:none;padding:5px 12px;border-radius:15px;margin-left:8px;cursor:pointer}
 .subscriber-item button.green{background:#4caf50}
+.user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee}
+.user-item button{background:#f44336;color:#fff;border:none;padding:4px 12px;border-radius:15px;cursor:pointer}
 </style></head><body>
 
 <div id="login-screen" class="screen active">
@@ -237,7 +239,7 @@ document.getElementById('logout-btn').onclick = () => {
     showLoginScreen();
 };
 
-// ПРОФИЛЬ - СМЕНА НИКА С ПРОВЕРКОЙ
+// ПРОФИЛЬ - СМЕНА НИКА (ИСПРАВЛЕНО)
 document.getElementById('avatar-img').onclick = () => document.getElementById('avatar-file').click();
 document.getElementById('avatar-file').onchange = function() {
     let f = this.files[0];
@@ -255,11 +257,12 @@ document.getElementById('avatar-file').onchange = function() {
 
 document.getElementById('save-nick-btn').onclick = () => {
     let newNick = document.getElementById('new-nick').value.trim();
-    if (!newNick || newNick === currentUser.nick) return;
+    if (!newNick) { alert('Введите новый ник'); return; }
+    if (newNick === currentUser.nick) { alert('Это ваш текущий ник'); return; }
     
     // Проверяем, существует ли уже такой ник у ДРУГОГО пользователя
     db.ref('users/' + newNick).once('value').then(snap => {
-        if (snap.exists() && snap.key !== currentUser.nick) {
+        if (snap.exists()) {
             alert('❌ Этот ник уже занят другим пользователем!');
             return;
         }
@@ -269,6 +272,7 @@ document.getElementById('save-nick-btn').onclick = () => {
         // 1. Сохраняем данные пользователя
         db.ref('users/' + oldNick).once('value').then(s => {
             let userData = s.val();
+            if (!userData) { alert('Ошибка: пользователь не найден'); return; }
             
             // 2. Создаём запись с новым ником
             db.ref('users/' + newNick).set({
@@ -317,11 +321,79 @@ document.getElementById('save-nick-btn').onclick = () => {
                 document.getElementById('profile-nick').textContent = newNick;
                 document.getElementById('new-nick').value = newNick;
                 loadChats();
-                location.reload(); // Перезагружаем чтобы обновить все данные
+                setTimeout(() => location.reload(), 500);
             });
         });
     });
 };
+
+// ========== УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (ТОЛЬКО ДЛЯ АДМИНОВ) ==========
+async function deleteUser(userNick) {
+    if (!isMainAdmin(currentUser?.nick)) {
+        alert('У вас нет прав на удаление пользователей');
+        return;
+    }
+    
+    if (userNick === currentUser.nick) {
+        alert('Нельзя удалить самого себя');
+        return;
+    }
+    
+    if (MAIN_ADMINS.includes(userNick)) {
+        alert('Нельзя удалить главного админа');
+        return;
+    }
+    
+    if (!confirm(`Вы уверены, что хотите удалить пользователя "${userNick}"? Все его сообщения и чаты будут удалены!`)) return;
+    
+    try {
+        // 1. Удаляем все сообщения пользователя
+        let messagesSnap = await db.ref('messages').once('value');
+        messagesSnap.forEach(chatMsgs => {
+            chatMsgs.forEach(msg => {
+                if (msg.val().sender === userNick) {
+                    db.ref('messages/' + chatMsgs.key + '/' + msg.key).remove();
+                }
+            });
+        });
+        
+        // 2. Удаляем пользователя из всех чатов
+        let chatsSnap = await db.ref('chats').once('value');
+        chatsSnap.forEach(chat => {
+            let members = chat.val().members || [];
+            if (members.includes(userNick)) {
+                let newMembers = members.filter(m => m !== userNick);
+                db.ref('chats/' + chat.key + '/members').set(newMembers);
+            }
+            let admins = chat.val().admins || [];
+            if (admins.includes(userNick)) {
+                let newAdmins = admins.filter(a => a !== userNick);
+                db.ref('chats/' + chat.key + '/admins').set(newAdmins);
+            }
+            if (chat.val().owner === userNick) {
+                db.ref('chats/' + chat.key + '/owner').set(null);
+            }
+        });
+        
+        // 3. Удаляем запись пользователя
+        await db.ref('users/' + userNick).remove();
+        
+        // 4. Если удалённый пользователь сейчас онлайн — выкидываем его
+        if (currentUser && currentUser.nick === userNick) {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            alert('Ваш аккаунт был удалён администратором');
+            showLoginScreen();
+        }
+        
+        alert(`✅ Пользователь "${userNick}" удалён`);
+        loadUsersList(); // Обновляем список пользователей
+        loadStats();
+    } catch(e) {
+        console.error('Ошибка удаления:', e);
+        alert('Ошибка при удалении: ' + e.message);
+    }
+}
 
 // АДМИН
 async function loadStats() {
@@ -339,7 +411,17 @@ async function loadUsersList() {
     list.innerHTML = 'Загрузка...';
     let users = [];
     await db.ref('users').once('value', s => { s.forEach(u => users.push(u.key)); });
-    list.innerHTML = users.map(u => `<div style="padding:8px;border-bottom:1px solid #ddd">${u}</div>`).join('');
+    
+    if (isMainAdmin(currentUser?.nick)) {
+        list.innerHTML = users.map(u => `
+            <div class="user-item">
+                <span>${u}</span>
+                ${!MAIN_ADMINS.includes(u) && u !== currentUser?.nick ? `<button onclick="deleteUser('${u}')">🗑️ Удалить</button>` : ''}
+            </div>
+        `).join('');
+    } else {
+        list.innerHTML = users.map(u => `<div class="user-item"><span>${u}</span></div>`).join('');
+    }
 }
 
 async function loadDeleteList() {
