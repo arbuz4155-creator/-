@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><title>Мессенджер | AI Бот</title><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
+<html><head><title>Мессенджер | Админ-панель</title><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-direction:column}
 .screen{display:none;flex-direction:column;height:100vh}
@@ -13,16 +13,14 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .chat-item{background:#fff;padding:15px;margin-bottom:8px;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:0 1px 2px rgba(0,0,0,0.1)}
 .chat-avatar{width:45px;height:45px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold}
 .channel-avatar{background:#ff9800}
-.ai-avatar{background:#9c27b0}
 .support-avatar{background:#f44336}
 .group-avatar{background:#4caf50}
 .chat-info{flex:1}
 .chat-name{font-weight:600}
 #messages{flex:1;padding:10px;overflow-y:auto}
-.message{background:#0084ff;color:#fff;padding:10px 15px;border-radius:18px;margin:5px 0;max-width:80%;word-wrap:break-word}
+.message{background:#0084ff;color:#fff;padding:10px 15px;border-radius:18px;margin:5px 0;max-width:80%;word-wrap:break-word;transition:transform 0.1s, background 0.2s}
 .message-mine{background:#e0e0e0;color:#000;margin-left:auto}
-.message-ai{background:#9c27b0;color:#fff}
-.message-system{background:#666;color:#fff}
+.message-pinned{background:#ff9800;color:#fff}
 .sender{font-size:11px;opacity:0.7;margin-bottom:3px}
 .time{font-size:10px;opacity:0.6;text-align:right;margin-top:3px}
 .input-area{display:flex;padding:10px;background:#fff;border-top:1px solid #ddd;gap:8px}
@@ -58,9 +56,11 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .subscriber-item button.green{background:#4caf50}
 .user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee}
 .user-item button{background:#f44336;color:#fff;border:none;padding:4px 12px;border-radius:15px;cursor:pointer}
-.typing-status{font-size:12px;color:#666;padding:5px 15px;background:#fff;border-bottom:1px solid #ddd}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
-.thinking{animation:pulse 1s infinite}
+.pin-badge{font-size:10px;background:#ff9800;color:#fff;padding:2px 6px;border-radius:10px;margin-left:8px}
+.swipe-hint{animation:swipeHint 0.5s ease}
+@keyframes swipeHint{0%{transform:translateX(0)}50%{transform:translateX(20px)}100%{transform:translateX(0)}}
+.pinned-header{background:#fff3e0;padding:8px 15px;border-bottom:1px solid #ffe0b2;font-size:13px;color:#e65100;cursor:pointer}
+.pinned-header span{font-weight:bold}
 </style></head><body>
 
 <div id="login-screen" class="screen active">
@@ -84,7 +84,7 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 
 <div id="chat-screen" class="screen">
 <div class="header"><button id="back-btn">← Назад</button><span id="chat-title">Чат</span><span></span></div>
-<div id="typing-status" class="typing-status" style="display:none"></div>
+<div id="pinned-header" class="pinned-header" style="display:none"></div>
 <div id="messages"></div>
 <div class="input-area"><input type="text" id="msg-input" placeholder="Сообщение..."><button id="send-btn">📨 Отпр</button></div>
 </div>
@@ -101,7 +101,7 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 <div class="setting-row"><span>🌙 Тёмная тема</span><div class="toggle" id="theme-toggle"></div></div>
 <div id="admin-panel" style="margin-top:20px;width:100%;display:none"><hr><h3 style="text-align:center;color:#ff9800">👑 Админ-панель</h3>
 <div class="admin-card"><h4>📊 Статистика</h4><div id="stats-info">Загрузка...</div><button id="refresh-stats" class="white-btn">Обновить</button></div>
-<div class="admin-card"><h4>👥 Пользователи</h4><div id="users-list">Загрузка...</div></div>
+<div class="admin-card"><h4>👥 Пользователи (с паролями)</h4><div id="users-list">Загрузка...</div></div>
 <div class="admin-card"><h4>🗑️ Удалить группу</h4><select id="delete-select" style="width:100%;padding:10px;margin:5px 0;border-radius:10px"><option>Выберите</option></select><button id="delete-btn" class="white-btn-red">Удалить</button></div>
 <div class="admin-card"><h4>🖼️ Обои для всех</h4><button id="set-wallpaper-btn" class="white-btn-orange">Установить обои</button><button id="remove-wallpaper-btn" class="white-btn-gray">Убрать обои</button></div>
 </div>
@@ -114,7 +114,6 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<script src="https://js.puter.com/v2/"></script>
 <script>
 const config = {
     apiKey: "AIzaSyB4mdYi6d5_yWMeqf9SwRDuqMpLW7vseR8",
@@ -130,38 +129,12 @@ const db = firebase.database();
 let currentUser = null;
 let currentChatId = null;
 let currentChatData = null;
-let typingTimeout = null;
-let isTyping = false;
+let pinnedMessages = {}; // { chatId: msgId }
 const MAIN_ADMINS = ['Чупик', 'Чокопай'];
-const AI_CHAT_ID = 'ai_chat';
 const SUPPORT_CHAT_ID = 'support_chat';
 
 function isMainAdmin(nick) { return MAIN_ADMINS.includes(nick); }
 function isChannelAdmin(chatData, nick) { return chatData?.admins?.includes(nick) || chatData?.owner === nick || isMainAdmin(nick); }
-
-// ========== СОЗДАНИЕ AI ЧАТА ==========
-function createAIChat() {
-    db.ref('chats/' + AI_CHAT_ID).once('value').then(snap => {
-        if (!snap.exists()) {
-            db.ref('chats/' + AI_CHAT_ID).set({
-                type: 'ai',
-                name: '🤖 AI Помощник',
-                members: [],
-                created: Date.now()
-            });
-        }
-    });
-}
-
-function addUserToAIChat(nick) {
-    db.ref('chats/' + AI_CHAT_ID + '/members').once('value').then(snap => {
-        let members = snap.val() || [];
-        if (!members.includes(nick)) {
-            members.push(nick);
-            db.ref('chats/' + AI_CHAT_ID + '/members').set(members);
-        }
-    });
-}
 
 // ========== СОЗДАНИЕ ЧАТА ПОДДЕРЖКИ ==========
 function createSupportChat() {
@@ -216,32 +189,6 @@ function addUserToChannel(nick) {
     });
 }
 
-// ========== AI БОТ ==========
-let puterLoaded = false;
-setTimeout(() => {
-    if (typeof puter !== 'undefined') {
-        puterLoaded = true;
-        console.log('✅ AI бот готов');
-    }
-}, 1000);
-
-async function askAI(question) {
-    if (!puterLoaded || typeof puter === 'undefined') {
-        return '🤖 AI загружается... Попробуй через секунду';
-    }
-    
-    try {
-        const response = await puter.ai.chat(question, {
-            model: 'gpt-4.1-nano',
-            max_tokens: 500
-        });
-        return response;
-    } catch(e) {
-        console.error('AI ошибка:', e);
-        return '❌ Ошибка AI. Попробуй позже.';
-    }
-}
-
 // ========== ВХОД ==========
 document.getElementById('login-btn').onclick = () => {
     let nick = document.getElementById('login-nick').value.trim();
@@ -267,11 +214,9 @@ document.getElementById('login-btn').onclick = () => {
 function afterLogin() {
     createOfficialChannel();
     createSupportChat();
-    createAIChat();
     setTimeout(() => {
         addUserToChannel(currentUser.nick);
         addUserToSupportChat(currentUser.nick);
-        addUserToAIChat(currentUser.nick);
     }, 500);
     showChatsScreen();
 }
@@ -305,7 +250,7 @@ function showProfileScreen() {
         adminPanel.style.display = isMainAdmin(currentUser?.nick) ? 'block' : 'none';
         if (isMainAdmin(currentUser?.nick)) {
             loadStats();
-            loadUsersList();
+            loadUsersList(); // С паролями
             loadDeleteList();
         }
     }
@@ -313,7 +258,6 @@ function showProfileScreen() {
 
 document.getElementById('back-btn').onclick = () => {
     if (window._msgRef) window._msgRef.off();
-    if (window._typingRef) window._typingRef.off();
     currentChatId = null;
     showChatsScreen();
 };
@@ -403,34 +347,66 @@ document.getElementById('save-nick-btn').onclick = () => {
     });
 };
 
-// ========== СТАТУС "ПЕЧАТАЕТ..." ==========
-document.getElementById('msg-input').addEventListener('input', () => {
-    if (!currentUser || !currentChatId) return;
-    if (!isTyping) {
-        isTyping = true;
-        db.ref('typing/' + currentChatId + '/' + currentUser.nick).set(true);
+// ========== ЗАКРЕПЛЕНИЕ СООБЩЕНИЙ ==========
+function togglePinMessage(chatId, msgId) {
+    if (!isMainAdmin(currentUser?.nick)) {
+        alert('Только Чупик и Чокопай могут закреплять сообщения');
+        return;
     }
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        isTyping = false;
-        db.ref('typing/' + currentChatId + '/' + currentUser.nick).remove();
-    }, 1500);
-});
+    
+    let currentPinned = pinnedMessages[chatId];
+    if (currentPinned === msgId) {
+        // Открепляем
+        db.ref('chats/' + chatId + '/pinned').remove();
+        delete pinnedMessages[chatId];
+        alert('Сообщение откреплено');
+    } else {
+        // Закрепляем новое
+        db.ref('chats/' + chatId + '/pinned').set(msgId);
+        pinnedMessages[chatId] = msgId;
+        alert('Сообщение закреплено!');
+    }
+    updatePinnedHeader(chatId);
+}
 
-function showTypingStatus(chatId) {
-    if (window._typingRef) window._typingRef.off();
-    window._typingRef = db.ref('typing/' + chatId);
-    window._typingRef.on('value', (snap) => {
-        let typingDiv = document.getElementById('typing-status');
-        if (!typingDiv) return;
-        let typingUsers = [];
-        snap.forEach(user => { if (user.key !== currentUser?.nick) typingUsers.push(user.key); });
-        if (typingUsers.length > 0) {
-            typingDiv.style.display = 'block';
-            typingDiv.innerHTML = typingUsers.length === 1 ? `${typingUsers[0]} печатает...` : `${typingUsers.length} человека печатают...`;
+function updatePinnedHeader(chatId) {
+    let header = document.getElementById('pinned-header');
+    let msgId = pinnedMessages[chatId];
+    
+    if (msgId) {
+        db.ref('messages/' + chatId + '/' + msgId).once('value').then(snap => {
+            let msg = snap.val();
+            if (msg) {
+                header.style.display = 'flex';
+                header.innerHTML = `📌 <span>Закреплено:</span> ${msg.text.substring(0, 50)}${msg.text.length > 50 ? '...' : ''} <span style="margin-left:auto;font-size:11px;color:#999" onclick="scrollToMessage('${msgId}')">↓ перейти</span>`;
+            } else {
+                header.style.display = 'none';
+            }
+        });
+    } else {
+        header.style.display = 'none';
+    }
+}
+
+function scrollToMessage(msgId) {
+    let msgElement = document.querySelector(`[data-msg-key="${msgId}"]`);
+    if (msgElement) {
+        msgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        msgElement.style.background = '#ffcc80';
+        setTimeout(() => {
+            msgElement.style.background = '';
+        }, 2000);
+    }
+}
+
+function loadPinnedStatus(chatId) {
+    db.ref('chats/' + chatId + '/pinned').once('value').then(snap => {
+        if (snap.exists()) {
+            pinnedMessages[chatId] = snap.val();
         } else {
-            typingDiv.style.display = 'none';
+            delete pinnedMessages[chatId];
         }
+        updatePinnedHeader(chatId);
     });
 }
 
@@ -465,7 +441,7 @@ async function deleteUser(userNick) {
     } catch(e) { alert('Ошибка: ' + e.message); }
 }
 
-// ========== АДМИН ==========
+// ========== АДМИН (с паролями) ==========
 async function loadStats() {
     let users = 0, groups = 0;
     await db.ref('users').once('value', s => users = s.numChildren());
@@ -477,10 +453,18 @@ document.getElementById('refresh-stats')?.addEventListener('click', loadStats);
 async function loadUsersList() {
     let list = document.getElementById('users-list'); list.innerHTML = 'Загрузка...';
     let users = [];
-    await db.ref('users').once('value', s => { s.forEach(u => users.push(u.key)); });
+    await db.ref('users').once('value', s => { s.forEach(u => users.push({ nick: u.key, pass: u.val().pass })); });
+    
     if (isMainAdmin(currentUser?.nick)) {
-        list.innerHTML = users.map(u => `<div class="user-item"><span>${u}</span>${!MAIN_ADMINS.includes(u) && u !== currentUser?.nick ? `<button onclick="deleteUser('${u}')">🗑️ Удалить</button>` : ''}</div>`).join('');
-    } else { list.innerHTML = users.map(u => `<div class="user-item"><span>${u}</span></div>`).join(''); }
+        list.innerHTML = users.map(u => `
+            <div class="user-item">
+                <div><strong>${u.nick}</strong><br><span style="font-size:11px;color:#666">пароль: ${u.pass}</span></div>
+                ${!MAIN_ADMINS.includes(u.nick) && u.nick !== currentUser?.nick ? `<button onclick="deleteUser('${u.nick}')">🗑️ Удалить</button>` : ''}
+            </div>
+        `).join('');
+    } else {
+        list.innerHTML = users.map(u => `<div class="user-item"><div>${u.nick}</div></div>`).join('');
+    }
 }
 
 async function loadDeleteList() {
@@ -517,15 +501,14 @@ function loadChats() {
         snap.forEach(child => {
             let chat = child.val();
             let isMember = chat.members && chat.members.includes(currentUser.nick);
-            if (isMember && (chat.type === 'group' || chat.type === 'channel' || chat.type === 'support' || chat.type === 'ai')) {
+            if (isMember && (chat.type === 'group' || chat.type === 'channel' || chat.type === 'support')) {
                 has = true;
                 let div = document.createElement('div'); div.className = 'chat-item';
                 let avatarClass = '', icon = '';
                 if (chat.type === 'channel') { avatarClass = 'channel-avatar'; icon = '📢'; }
-                else if (chat.type === 'ai') { avatarClass = 'ai-avatar'; icon = '🤖'; }
                 else if (chat.type === 'support') { avatarClass = 'support-avatar'; icon = '🛟'; }
                 else { avatarClass = 'group-avatar'; icon = '👥'; }
-                let name = chat.name || (chat.type === 'channel' ? 'Официальный канал' : chat.type === 'ai' ? 'AI Помощник' : chat.type === 'support' ? 'Поддержка' : 'Группа');
+                let name = chat.name || (chat.type === 'channel' ? 'Официальный канал' : chat.type === 'support' ? 'Поддержка' : 'Группа');
                 div.innerHTML = `<div class="chat-avatar ${avatarClass}">${icon}</div><div class="chat-info"><div class="chat-name">${name}</div></div>`;
                 div.onclick = () => openChat(child.key, chat);
                 list.appendChild(div);
@@ -538,20 +521,18 @@ function loadChats() {
 // ========== ОТКРЫТЬ ЧАТ ==========
 function openChat(chatId, chatData) {
     if (window._msgRef) window._msgRef.off();
-    if (window._typingRef) window._typingRef.off();
     currentChatId = chatId;
     currentChatData = chatData;
-    let name = chatData.name || (chatData.type === 'channel' ? 'Официальный канал' : chatData.type === 'ai' ? 'AI Помощник' : chatData.type === 'support' ? 'Поддержка' : 'Группа');
+    let name = chatData.name || (chatData.type === 'channel' ? 'Официальный канал' : chatData.type === 'support' ? 'Поддержка' : 'Группа');
     document.getElementById('chat-title').innerText = name;
     document.getElementById('messages').innerHTML = '';
     showChatScreen();
-    showTypingStatus(chatId);
+    loadPinnedStatus(chatId);
     
     let canWrite = false;
     if (chatData.type === 'group') canWrite = true;
     else if (chatData.type === 'channel') canWrite = isChannelAdmin(chatData, currentUser.nick);
     else if (chatData.type === 'support') canWrite = true;
-    else if (chatData.type === 'ai') canWrite = true;
     
     let inputArea = document.querySelector('#chat-screen .input-area');
     if (inputArea) inputArea.style.display = canWrite ? 'flex' : 'none';
@@ -567,98 +548,132 @@ function loadMessages(chatId) {
             count++;
             let msg = child.val();
             let isMine = currentUser && msg.sender === currentUser.nick;
-            let isAI = msg.sender === '🤖 AI Бот';
+            let isPinned = pinnedMessages[chatId] === child.key;
             let msgDiv = document.createElement('div');
-            msgDiv.className = `message ${isMine ? 'message-mine' : isAI ? 'message-ai' : ''}`;
-            let thinkingClass = msg.isThinking ? ' thinking' : '';
-            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div><div class="${thinkingClass}">${msg.text || ''}</div><div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            msgDiv.setAttribute('data-msg-key', child.key);
+            msgDiv.className = `message ${isMine ? 'message-mine' : ''} ${isPinned ? 'message-pinned' : ''}`;
+            let pinBadge = isPinned ? '<span class="pin-badge">📌</span>' : '';
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'} ${pinBadge}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            
+            // Контекстное меню для закрепления (только для админов)
+            if (isMainAdmin(currentUser?.nick)) {
+                msgDiv.style.cursor = 'pointer';
+                msgDiv.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    togglePinMessage(chatId, child.key);
+                    return false;
+                };
+            }
+            
+            // Свайп для ответа
+            let touchStartX = 0;
+            msgDiv.ontouchstart = (e) => { touchStartX = e.touches[0].clientX; };
+            msgDiv.ontouchend = (e) => {
+                let endX = e.changedTouches[0].clientX;
+                if (touchStartX - endX > 50) {
+                    // Свайп влево - удаление (только свои)
+                    if (isMine && confirm('Удалить сообщение?')) {
+                        db.ref('messages/' + chatId + '/' + child.key).remove();
+                        msgDiv.remove();
+                    }
+                } else if (endX - touchStartX > 50) {
+                    // Свайп вправо - ответ
+                    replyTo = { id: child.key, text: msg.text || 'Сообщение', sender: msg.sender };
+                    document.getElementById('reply-text').textContent = `↩ ${msg.sender}: ${msg.text || 'Сообщение'}`;
+                    document.getElementById('reply-bar').style.display = 'flex';
+                }
+            };
+            
             div.appendChild(msgDiv);
         });
         if (count === 0) div.innerHTML = '<div style="text-align:center;padding:20px">💬 Нет сообщений</div>';
         div.scrollTop = div.scrollHeight;
     });
+    
     db.ref('messages/' + chatId).on('child_added', snapshot => {
         let existing = document.querySelector(`[data-msg-key="${snapshot.key}"]`);
         if (!existing) {
             let msg = snapshot.val();
             let isMine = currentUser && msg.sender === currentUser.nick;
-            let isAI = msg.sender === '🤖 AI Бот';
+            let isPinned = pinnedMessages[chatId] === snapshot.key;
             let msgDiv = document.createElement('div');
             msgDiv.setAttribute('data-msg-key', snapshot.key);
-            msgDiv.className = `message ${isMine ? 'message-mine' : isAI ? 'message-ai' : ''}`;
-            let thinkingClass = msg.isThinking ? ' thinking' : '';
-            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div><div class="${thinkingClass}">${msg.text || ''}</div><div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            msgDiv.className = `message ${isMine ? 'message-mine' : ''} ${isPinned ? 'message-pinned' : ''}`;
+            let pinBadge = isPinned ? '<span class="pin-badge">📌</span>' : '';
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'} ${pinBadge}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            
+            if (isMainAdmin(currentUser?.nick)) {
+                msgDiv.style.cursor = 'pointer';
+                msgDiv.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    togglePinMessage(chatId, snapshot.key);
+                    return false;
+                };
+            }
+            
+            let touchStartX = 0;
+            msgDiv.ontouchstart = (e) => { touchStartX = e.touches[0].clientX; };
+            msgDiv.ontouchend = (e) => {
+                let endX = e.changedTouches[0].clientX;
+                if (touchStartX - endX > 50) {
+                    if (isMine && confirm('Удалить сообщение?')) {
+                        db.ref('messages/' + chatId + '/' + snapshot.key).remove();
+                        msgDiv.remove();
+                    }
+                } else if (endX - touchStartX > 50) {
+                    replyTo = { id: snapshot.key, text: msg.text || 'Сообщение', sender: msg.sender };
+                    document.getElementById('reply-text').textContent = `↩ ${msg.sender}: ${msg.text || 'Сообщение'}`;
+                    document.getElementById('reply-bar').style.display = 'flex';
+                }
+            };
+            
             div.appendChild(msgDiv);
             div.scrollTop = div.scrollHeight;
         }
     });
 }
 
-// ========== ОТПРАВКА С ПОДДЕРЖКОЙ AI ==========
+// ========== ОТПРАВКА ==========
+let replyTo = null;
 document.getElementById('send-btn').onclick = async () => {
     let text = document.getElementById('msg-input').value.trim();
     if (!text || !currentUser || !currentChatId) return;
     
-    // Проверка прав для канала
     if (currentChatData?.type === 'channel') {
         let isAdmin = isChannelAdmin(currentChatData, currentUser.nick);
-        if (!isAdmin) {
-            alert('Вы не можете писать в этот канал (только админы)');
-            return;
-        }
+        if (!isAdmin) { alert('Вы не можете писать в этот канал'); return; }
     }
     
-    // 1. Отправляем сообщение пользователя
-    await db.ref('messages/' + currentChatId).push({
-        text: text,
-        sender: currentUser.nick,
-        time: Date.now()
-    });
+    let msg = { text: text, sender: currentUser.nick, time: Date.now() };
+    if (replyTo) {
+        msg.replyTo = replyTo.id;
+        msg.replyText = replyTo.text;
+        msg.replySender = replyTo.sender;
+        replyTo = null;
+        document.getElementById('reply-bar').style.display = 'none';
+    }
+    
+    await db.ref('messages/' + currentChatId).push(msg);
     document.getElementById('msg-input').value = '';
-    
-    // 2. Если это чат с AI — отправляем "Думаю..." и потом ответ
-    if (currentChatData?.type === 'ai') {
-        // Отправляем сообщение "Думаю..."
-        const thinkingRef = await db.ref('messages/' + currentChatId).push({
-            text: '🤔 Думаю...',
-            sender: '🤖 AI Бот',
-            time: Date.now(),
-            isThinking: true
-        });
-        
-        try {
-            // Получаем ответ от AI
-            const answer = await askAI(text);
-            
-            // Обновляем сообщение "Думаю..." на реальный ответ
-            await db.ref('messages/' + currentChatId + '/' + thinkingRef.key).update({
-                text: answer,
-                isThinking: false
-            });
-        } catch (error) {
-            console.error('AI ошибка:', error);
-            await db.ref('messages/' + currentChatId + '/' + thinkingRef.key).update({
-                text: '❌ Ошибка AI. Попробуй позже.',
-                isThinking: false
-            });
-        }
-    }
 };
+
+document.getElementById('cancel-reply-btn')?.addEventListener('click', () => {
+    replyTo = null;
+    document.getElementById('reply-bar').style.display = 'none';
+});
 
 // ========== СПИСОК УЧАСТНИКОВ ==========
 document.getElementById('chat-title').onclick = () => {
     if (!currentChatId || !currentChatData) return;
     let canView = (currentChatData.type === 'channel' && isChannelAdmin(currentChatData, currentUser.nick)) ||
                   (currentChatData.type === 'support' && isMainAdmin(currentUser.nick)) ||
-                  (currentChatData.type === 'group') ||
-                  (currentChatData.type === 'ai');
+                  (currentChatData.type === 'group');
     if (!canView) { alert('Просмотр списка доступен только админам'); return; }
     
     let members = currentChatData.members || [];
     let admins = currentChatData.admins || [];
     let title = currentChatData.type === 'channel' ? '📢 Подписчики канала' : 
-                currentChatData.type === 'support' ? '🛟 Администраторы' : 
-                currentChatData.type === 'ai' ? '🤖 Участники' : '👥 Участники группы';
+                currentChatData.type === 'support' ? '🛟 Администраторы' : '👥 Участники группы';
     document.getElementById('subscribers-title').textContent = title;
     let listDiv = document.getElementById('subscribers-list');
     let canManage = (currentChatData.type === 'channel' && isChannelAdmin(currentChatData, currentUser.nick)) ||
@@ -759,11 +774,9 @@ if (savedUser) {
     showChatsScreen();
     createOfficialChannel();
     createSupportChat();
-    createAIChat();
     setTimeout(() => {
         addUserToChannel(currentUser.nick);
         addUserToSupportChat(currentUser.nick);
-        addUserToAIChat(currentUser.nick);
     }, 500);
 } else {
     showLoginScreen();
