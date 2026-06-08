@@ -1,37 +1,714 @@
 <!DOCTYPE html>
-<html><head><title>Мессенджер | Анимации + Поддержка</title><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><style>
+<html><head><title>Мессенджер</title><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-direction:column}
 .screen{display:none;flex-direction:column;height:100vh}
 .screen.active{display:flex}
+.header{background:#0084ff;color:#fff;padding:15px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.header button{background:rgba(255,255,255,0.2);color:#fff;border:none;padding:8px 15px;border-radius:20px;cursor:pointer}
+#login-box{background:#fff;padding:30px;border-radius:15px;text-align:center;width:85%;max-width:350px;margin:auto}
+#login-box input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:10px;font-size:16px}
+#login-box button{width:100%;padding:12px;margin-top:10px;background:#0084ff;color:#fff;border:none;border-radius:10px;font-size:18px;cursor:pointer}
+#chats-list{flex:1;overflow-y:auto;padding:10px}
+.chat-item{background:#fff;padding:15px;margin-bottom:8px;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:0 1px 2px rgba(0,0,0,0.1)}
+.chat-avatar{width:45px;height:45px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold}
+.channel-avatar{background:#ff9800}
+.group-avatar{background:#4caf50}
+.chat-info{flex:1}
+.chat-name{font-weight:600}
+#messages{flex:1;padding:10px;overflow-y:auto}
+.message{background:#0084ff;color:#fff;padding:10px 15px;border-radius:18px;margin:5px 0;max-width:80%;word-wrap:break-word}
+.message-mine{background:#e0e0e0;color:#000;margin-left:auto}
+.sender{font-size:11px;opacity:0.7;margin-bottom:3px}
+.time{font-size:10px;opacity:0.6;text-align:right;margin-top:3px}
+.input-area{display:flex;padding:10px;background:#fff;border-top:1px solid #ddd;gap:8px}
+.input-area input{flex:1;padding:12px;border:1px solid #ddd;border-radius:25px;font-size:16px}
+.input-area button{padding:12px 20px;background:#0084ff;color:#fff;border:none;border-radius:25px;font-size:16px;cursor:pointer}
+.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;border-radius:50%;background:#0084ff;color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:100}
+.fab:active{transform:scale(0.95)}
+.menu-panel{position:fixed;bottom:90px;right:20px;background:#fff;border-radius:20px;padding:8px 0;min-width:190px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:101;display:none}
+.menu-panel button{width:100%;padding:14px 20px;border:none;background:none;text-align:left;font-size:16px;cursor:pointer}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:200}
+.modal-content{background:#fff;border-radius:20px;padding:20px;width:85%;max-width:320px;text-align:center}
+.modal-content input{width:100%;padding:12px;margin:10px 0;border:1px solid #ddd;border-radius:10px;font-size:16px}
+.modal-content button{padding:10px 20px;margin:5px;border-radius:10px;border:none;background:#0084ff;color:#fff;font-size:16px;cursor:pointer}
+.profile-content{flex:1;display:flex;flex-direction:column;align-items:center;padding:30px}
+.profile-content img{width:100px;height:100px;border-radius:50%;object-fit:cover;background:#ddd;margin-bottom:15px;cursor:pointer}
+.profile-content input[type="text"]{width:80%;padding:12px;margin:10px 0;border:1px solid #ddd;border-radius:10px;font-size:16px}
+.profile-content button{padding:10px 20px;background:#0084ff;color:#fff;border:none;border-radius:10px;margin:5px;cursor:pointer}
+.setting-row{display:flex;justify-content:space-between;align-items:center;width:80%;padding:15px;background:#fff;border-radius:10px;margin:10px 0}
+.toggle{width:50px;height:26px;background:#ccc;border-radius:13px;position:relative;cursor:pointer}
+.toggle.active{background:#34c759}
+.toggle::after{content:'';width:22px;height:22px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:.2s}
+.toggle.active::after{left:26px}
+.admin-card{background:#fff;border-radius:16px;padding:15px;margin:10px 0;width:100%}
+.admin-card h4{margin-bottom:10px;color:#0084ff}
+.white-btn{background:#fff;color:#1976d2;border:2px solid #1976d2;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
+.white-btn-red{background:#fff;color:#c62828;border:2px solid #f44336;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
+.white-btn-orange{background:#fff;color:#e65100;border:2px solid #ff9800;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
+.white-btn-gray{background:#fff;color:#616161;border:2px solid #9e9e9e;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
+.subscriber-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee}
+.subscriber-item .nick{font-weight:600}
+.subscriber-item .badge{background:#ff9800;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:8px}
+.subscriber-item button{background:#f44336;color:#fff;border:none;padding:5px 12px;border-radius:15px;margin-left:8px;cursor:pointer}
+.subscriber-item button.green{background:#4caf50}
+.user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee}
+.user-item button{background:#f44336;color:#fff;border:none;padding:4px 12px;border-radius:15px;cursor:pointer}
+</style></head><body>
 
-/* ========== АНИМАЦИИ ========== */
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+<div id="login-screen" class="screen active">
+<div id="login-box">
+<h1>🔐 Вход</h1>
+<input type="text" id="login-nick" placeholder="Никнейм">
+<input type="password" id="login-pass" placeholder="Пароль">
+<button id="login-btn">Войти</button>
+</div>
+</div>
+
+<div id="chats-screen" class="screen">
+<div class="header"><span>📱 Мессенджер</span><button id="to-profile-btn">Профиль</button></div>
+<div id="chats-list">Загрузка...</div>
+<button class="fab" id="fab-btn">+</button>
+<div class="menu-panel" id="menu-panel">
+<button id="menu-create-group">👥 Создать группу</button>
+<button id="menu-join-group">🔗 Вступить в группу</button>
+</div>
+</div>
+
+<div id="chat-screen" class="screen">
+<div class="header"><button id="back-btn">← Назад</button><span id="chat-title">Чат</span><span></span></div>
+<div id="messages"></div>
+<div class="input-area"><input type="text" id="msg-input" placeholder="Сообщение..."><button id="send-btn">📨 Отпр</button></div>
+</div>
+
+<div id="profile-screen" class="screen">
+<div class="header"><button id="profile-back-btn">← Назад</button><span>Профиль</span><button id="logout-btn">Выйти</button></div>
+<div class="profile-content">
+<img id="avatar-img" src="" onclick="document.getElementById('avatar-file').click()">
+<input type="file" id="avatar-file" accept="image/*" style="display:none">
+<p style="font-size:12px;color:#666">Нажми на аватар</p>
+<p id="profile-nick" style="font-weight:700;font-size:20px"></p>
+<input type="text" id="new-nick" placeholder="Новый ник">
+<button id="save-nick-btn">Сохранить ник</button>
+<div class="setting-row"><span>🌙 Тёмная тема</span><div class="toggle" id="theme-toggle"></div></div>
+<div id="admin-panel" style="margin-top:20px;width:100%;display:none"><hr><h3 style="text-align:center;color:#ff9800">👑 Админ-панель</h3>
+<div class="admin-card"><h4>📊 Статистика</h4><div id="stats-info">Загрузка...</div><button id="refresh-stats" class="white-btn">Обновить</button></div>
+<div class="admin-card"><h4>👥 Пользователи</h4><div id="users-list">Загрузка...</div></div>
+<div class="admin-card"><h4>🗑️ Удалить группу</h4><select id="delete-select" style="width:100%;padding:10px;margin:5px 0;border-radius:10px"><option>Выберите</option></select><button id="delete-btn" class="white-btn-red">Удалить</button></div>
+<div class="admin-card"><h4>🖼️ Обои для всех</h4><button id="set-wallpaper-btn" class="white-btn-orange">Установить обои</button><button id="remove-wallpaper-btn" class="white-btn-gray">Убрать обои</button></div>
+</div>
+</div>
+</div>
+
+<div id="subscribers-modal" class="modal"><div class="modal-content"><h3 id="subscribers-title">Участники</h3><div id="subscribers-list"></div><button id="close-subscribers">Закрыть</button></div></div>
+<div id="group-modal" class="modal"><div class="modal-content"><h3>👥 Создать группу</h3><input type="text" id="group-name" placeholder="Название"><input type="text" id="group-code" placeholder="Код"><button id="confirm-group">Создать</button><button id="close-group-modal">Отмена</button></div></div>
+<div id="join-group-modal" class="modal"><div class="modal-content"><h3>🔗 Вступить в группу</h3><input type="text" id="join-group-code" placeholder="Код"><button id="confirm-join-group">Вступить</button><button id="close-join-group-modal">Отмена</button></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+const config = {
+    apiKey: "AIzaSyB4mdYi6d5_yWMeqf9SwRDuqMpLW7vseR8",
+    authDomain: "website-9442c.firebaseapp.com",
+    projectId: "website-9442c",
+    storageBucket: "website-9442c.firebasestorage.app",
+    messagingSenderId: "490236144166",
+    appId: "1:490236144166:web:2651f3bc8a0a719e85d4e7"
+};
+firebase.initializeApp(config);
+const db = firebase.database();
+
+let currentUser = null;
+let currentChatId = null;
+let currentChatData = null;
+const MAIN_ADMINS = ['Чупик', 'Чокопай'];
+
+function isMainAdmin(nick) { return MAIN_ADMINS.includes(nick); }
+function isChannelAdmin(chatData, nick) { return chatData?.admins?.includes(nick) || chatData?.owner === nick || isMainAdmin(nick); }
+
+// ТЁМНАЯ ТЕМА
+if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
+document.getElementById('theme-toggle').onclick = function() {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('dark', document.body.classList.contains('dark'));
+    this.classList.toggle('active', document.body.classList.contains('dark'));
+};
+
+// СОЗДАНИЕ ОФИЦИАЛЬНОГО КАНАЛА
+function createOfficialChannel() {
+    db.ref('chats/official_channel').once('value').then(snap => {
+        if (!snap.exists()) {
+            db.ref('chats/official_channel').set({
+                type: 'channel',
+                name: 'Официальный канал',
+                members: [],
+                admins: MAIN_ADMINS,
+                owner: 'Чупик',
+                inviteCode: 'official',
+                created: Date.now()
+            });
+        }
+    });
 }
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+
+function addUserToChannel(nick) {
+    db.ref('chats/official_channel/members').once('value').then(snap => {
+        let members = snap.val() || [];
+        if (!members.includes(nick)) {
+            members.push(nick);
+            db.ref('chats/official_channel/members').set(members);
+        }
+    });
 }
-@keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-30px); }
-    to { opacity: 1; transform: translateX(0); }
+
+// ВХОД
+document.getElementById('login-btn').onclick = () => {
+    let nick = document.getElementById('login-nick').value.trim();
+    let pass = document.getElementById('login-pass').value.trim();
+    if (!nick || !pass) { alert('Заполните поля'); return; }
+    
+    db.ref('users/' + nick).once('value').then(snap => {
+        if (snap.exists()) {
+            if (snap.val().pass === pass) {
+                currentUser = { nick: nick, pass: pass, avatar: snap.val().avatar || '' };
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                afterLogin();
+            } else alert('Неверный пароль');
+        } else {
+            db.ref('users/' + nick).set({ pass: pass, avatar: '' });
+            currentUser = { nick: nick, pass: pass, avatar: '' };
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            afterLogin();
+        }
+    });
+};
+
+function afterLogin() {
+    createOfficialChannel();
+    setTimeout(() => addUserToChannel(currentUser.nick), 500);
+    showChatsScreen();
 }
-@keyframes slideInRight {
-    from { opacity: 0; transform: translateX(30px); }
-    to { opacity: 1; transform: translateX(0); }
+
+// ЭКРАНЫ
+function showLoginScreen() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('login-screen').classList.add('active');
 }
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+
+function showChatsScreen() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('chats-screen').classList.add('active');
+    loadChats();
 }
-@keyframes shake {
-    0%,100% { transform: translateX(0); }
-    25% { transform: translateX(-3px); }
-    75% { transform: translateX(3px); }
+
+function showChatScreen() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('chat-screen').classList.add('active');
 }
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to {
+
+function showProfileScreen() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('profile-screen').classList.add('active');
+    document.getElementById('profile-nick').textContent = currentUser.nick;
+    document.getElementById('new-nick').value = currentUser.nick;
+    document.getElementById('avatar-img').src = currentUser.avatar || '';
+    
+    let adminPanel = document.getElementById('admin-panel');
+    if (adminPanel) {
+        adminPanel.style.display = isMainAdmin(currentUser?.nick) ? 'block' : 'none';
+        if (isMainAdmin(currentUser?.nick)) {
+            loadStats();
+            loadUsersList();
+            loadDeleteList();
+        }
+    }
+}
+
+document.getElementById('back-btn').onclick = () => {
+    if (window._msgRef) window._msgRef.off();
+    currentChatId = null;
+    showChatsScreen();
+};
+document.getElementById('to-profile-btn').onclick = () => showProfileScreen();
+document.getElementById('profile-back-btn').onclick = () => showChatsScreen();
+document.getElementById('logout-btn').onclick = () => {
+    currentUser = null;
+    localStorage.removeItem('currentUser');
+    showLoginScreen();
+};
+
+// ПРОФИЛЬ
+document.getElementById('avatar-img').onclick = () => document.getElementById('avatar-file').click();
+document.getElementById('avatar-file').onchange = function() {
+    let f = this.files[0];
+    if (!f) return;
+    let r = new FileReader();
+    r.onload = e => {
+        let b64 = e.target.result;
+        currentUser.avatar = b64;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        document.getElementById('avatar-img').src = b64;
+        db.ref('users/' + currentUser.nick).update({ avatar: b64 });
+    };
+    r.readAsDataURL(f);
+};
+
+document.getElementById('save-nick-btn').onclick = () => {
+    let newNick = document.getElementById('new-nick').value.trim();
+    if (!newNick) { alert('Введите новый ник'); return; }
+    if (newNick === currentUser.nick) { alert('Это ваш текущий ник'); return; }
+    
+    db.ref('users/' + newNick).once('value').then(snap => {
+        if (snap.exists()) {
+            alert('❌ Этот ник уже занят другим пользователем!');
+            return;
+        }
+        
+        let oldNick = currentUser.nick;
+        
+        db.ref('users/' + oldNick).once('value').then(s => {
+            let userData = s.val();
+            if (!userData) { alert('Ошибка: пользователь не найден'); return; }
+            
+            db.ref('users/' + newNick).set({
+                pass: userData.pass,
+                avatar: userData.avatar || ''
+            }).then(() => {
+                db.ref('users/' + oldNick).remove();
+                
+                db.ref('chats').once('value').then(chats => {
+                    chats.forEach(chat => {
+                        let members = chat.val().members || [];
+                        if (members.includes(oldNick)) {
+                            db.ref('chats/' + chat.key + '/members').set(members.map(m => m === oldNick ? newNick : m));
+                        }
+                        if (chat.val().owner === oldNick) {
+                            db.ref('chats/' + chat.key + '/owner').set(newNick);
+                        }
+                        let admins = chat.val().admins || [];
+                        if (admins.includes(oldNick)) {
+                            db.ref('chats/' + chat.key + '/admins').set(admins.map(a => a === oldNick ? newNick : a));
+                        }
+                    });
+                });
+                
+                db.ref('messages').once('value').then(messages => {
+                    messages.forEach(chatMsgs => {
+                        chatMsgs.forEach(msg => {
+                            if (msg.val().sender === oldNick) {
+                                db.ref('messages/' + chatMsgs.key + '/' + msg.key + '/sender').set(newNick);
+                            }
+                        });
+                    });
+                });
+                
+                currentUser.nick = newNick;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                alert('✅ Ник изменён на ' + newNick);
+                document.getElementById('profile-nick').textContent = newNick;
+                document.getElementById('new-nick').value = newNick;
+                loadChats();
+                setTimeout(() => location.reload(), 500);
+            });
+        });
+    });
+};
+
+// УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ
+async function deleteUser(userNick) {
+    if (!isMainAdmin(currentUser?.nick)) {
+        alert('У вас нет прав на удаление пользователей');
+        return;
+    }
+    if (userNick === currentUser.nick) {
+        alert('Нельзя удалить самого себя');
+        return;
+    }
+    if (MAIN_ADMINS.includes(userNick)) {
+        alert('Нельзя удалить главного админа');
+        return;
+    }
+    if (!confirm(`Вы уверены, что хотите удалить пользователя "${userNick}"?`)) return;
+    
+    try {
+        let messagesSnap = await db.ref('messages').once('value');
+        messagesSnap.forEach(chatMsgs => {
+            chatMsgs.forEach(msg => {
+                if (msg.val().sender === userNick) {
+                    db.ref('messages/' + chatMsgs.key + '/' + msg.key).remove();
+                }
+            });
+        });
+        
+        let chatsSnap = await db.ref('chats').once('value');
+        chatsSnap.forEach(chat => {
+            let members = chat.val().members || [];
+            if (members.includes(userNick)) {
+                db.ref('chats/' + chat.key + '/members').set(members.filter(m => m !== userNick));
+            }
+            let admins = chat.val().admins || [];
+            if (admins.includes(userNick)) {
+                db.ref('chats/' + chat.key + '/admins').set(admins.filter(a => a !== userNick));
+            }
+            if (chat.val().owner === userNick) {
+                db.ref('chats/' + chat.key + '/owner').set(null);
+            }
+        });
+        
+        await db.ref('users/' + userNick).remove();
+        
+        if (currentUser && currentUser.nick === userNick) {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            alert('Ваш аккаунт был удалён администратором');
+            showLoginScreen();
+        }
+        
+        alert(`✅ Пользователь "${userNick}" удалён`);
+        loadUsersList();
+        loadStats();
+    } catch(e) {
+        console.error('Ошибка удаления:', e);
+        alert('Ошибка при удалении: ' + e.message);
+    }
+}
+
+// АДМИН
+async function loadStats() {
+    let users = 0, groups = 0;
+    await db.ref('users').once('value', s => users = s.numChildren());
+    await db.ref('chats').once('value', s => {
+        s.forEach(ch => { if (ch.val().type === 'group') groups++; });
+    });
+    document.getElementById('stats-info').innerHTML = `👥 Пользователей: ${users}<br>👥 Групп: ${groups}`;
+}
+document.getElementById('refresh-stats')?.addEventListener('click', loadStats);
+
+async function loadUsersList() {
+    let list = document.getElementById('users-list');
+    list.innerHTML = 'Загрузка...';
+    let users = [];
+    await db.ref('users').once('value', s => { s.forEach(u => users.push(u.key)); });
+    
+    if (isMainAdmin(currentUser?.nick)) {
+        list.innerHTML = users.map(u => `
+            <div class="user-item">
+                <span>${u}</span>
+                ${!MAIN_ADMINS.includes(u) && u !== currentUser?.nick ? `<button onclick="deleteUser('${u}')">🗑️ Удалить</button>` : ''}
+            </div>
+        `).join('');
+    } else {
+        list.innerHTML = users.map(u => `<div class="user-item"><span>${u}</span></div>`).join('');
+    }
+}
+
+async function loadDeleteList() {
+    let sel = document.getElementById('delete-select');
+    sel.innerHTML = '<option>Выберите группу</option>';
+    await db.ref('chats').once('value', s => {
+        s.forEach(ch => {
+            if (ch.val().type === 'group') {
+                sel.innerHTML += `<option value="${ch.key}">👥 ${ch.val().name || ch.key}</option>`;
+            }
+        });
+    });
+}
+document.getElementById('delete-btn')?.addEventListener('click', async () => {
+    let sel = document.getElementById('delete-select');
+    let id = sel.value;
+    if (!id || id === 'Выберите группу') { alert('Выберите группу'); return; }
+    if (confirm('Удалить группу?')) {
+        await db.ref('messages/' + id).remove();
+        await db.ref('chats/' + id).remove();
+        alert('Группа удалена');
+        loadDeleteList();
+        loadStats();
+        loadChats();
+    }
+});
+
+// ОБОИ
+document.getElementById('set-wallpaper-btn')?.addEventListener('click', () => {
+    let url = prompt('Вставьте прямую ссылку на картинку:');
+    if (url && url.startsWith('http')) {
+        db.ref('settings/wallpaper').set(url);
+        alert('✅ Обои установлены');
+    }
+});
+document.getElementById('remove-wallpaper-btn')?.addEventListener('click', () => {
+    if (confirm('Убрать обои?')) {
+        db.ref('settings/wallpaper').remove();
+        alert('🗑️ Обои убраны');
+    }
+});
+db.ref('settings/wallpaper').on('value', s => {
+    let url = s.val();
+    if (url && url !== 'null') {
+        document.body.style.backgroundImage = `url(${url})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundAttachment = 'fixed';
+    } else {
+        document.body.style.backgroundImage = '';
+    }
+});
+
+// ЗАГРУЗКА ЧАТОВ
+function loadChats() {
+    if (!currentUser) return;
+    db.ref('chats').once('value').then(snap => {
+        let list = document.getElementById('chats-list');
+        list.innerHTML = '';
+        let has = false;
+        
+        snap.forEach(child => {
+            let chat = child.val();
+            let isMember = chat.members && chat.members.includes(currentUser.nick);
+            
+            if (isMember && (chat.type === 'group' || chat.type === 'channel')) {
+                has = true;
+                let div = document.createElement('div');
+                div.className = 'chat-item';
+                let avatarClass = chat.type === 'channel' ? 'channel-avatar' : 'group-avatar';
+                let icon = chat.type === 'channel' ? '📢' : '👥';
+                div.innerHTML = `<div class="chat-avatar ${avatarClass}">${icon}</div><div class="chat-info"><div class="chat-name">${chat.name || (chat.type === 'channel' ? 'Официальный канал' : 'Группа')}</div></div>`;
+                div.onclick = () => openChat(child.key, chat);
+                list.appendChild(div);
+            }
+        });
+        
+        if (!has) list.innerHTML = '<p style="text-align:center;padding:20px">Нет чатов</p>';
+    });
+}
+
+// ОТКРЫТЬ ЧАТ
+function openChat(chatId, chatData) {
+    if (window._msgRef) window._msgRef.off();
+    currentChatId = chatId;
+    currentChatData = chatData;
+    document.getElementById('chat-title').innerText = chatData.name || (chatData.type === 'channel' ? 'Официальный канал' : 'Группа');
+    document.getElementById('messages').innerHTML = '';
+    showChatScreen();
+    
+    let canWrite = false;
+    if (chatData.type === 'group') canWrite = true;
+    else if (chatData.type === 'channel') canWrite = isChannelAdmin(chatData, currentUser.nick);
+    
+    let inputArea = document.querySelector('#chat-screen .input-area');
+    if (inputArea) inputArea.style.display = canWrite ? 'flex' : 'none';
+    
+    loadMessages(chatId);
+}
+
+// ЗАГРУЗКА СООБЩЕНИЙ
+function loadMessages(chatId) {
+    let div = document.getElementById('messages');
+    div.innerHTML = '<div style="text-align:center;padding:20px">⏳ Загрузка...</div>';
+    
+    db.ref('messages/' + chatId).once('value').then(snapshot => {
+        div.innerHTML = '';
+        let count = 0;
+        
+        snapshot.forEach(child => {
+            count++;
+            let msg = child.val();
+            let isMine = currentUser && msg.sender === currentUser.nick;
+            let msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isMine ? 'message-mine' : ''}`;
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            div.appendChild(msgDiv);
+        });
+        
+        if (count === 0) {
+            div.innerHTML = '<div style="text-align:center;padding:20px">💬 Нет сообщений</div>';
+        }
+        div.scrollTop = div.scrollHeight;
+    });
+    
+    db.ref('messages/' + chatId).on('child_added', snapshot => {
+        let existing = document.querySelector(`[data-msg-key="${snapshot.key}"]`);
+        if (!existing) {
+            let msg = snapshot.val();
+            let isMine = currentUser && msg.sender === currentUser.nick;
+            let msgDiv = document.createElement('div');
+            msgDiv.setAttribute('data-msg-key', snapshot.key);
+            msgDiv.className = `message ${isMine ? 'message-mine' : ''}`;
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            div.appendChild(msgDiv);
+            div.scrollTop = div.scrollHeight;
+        }
+    });
+}
+
+// ОТПРАВКА
+document.getElementById('send-btn').onclick = () => {
+    let text = document.getElementById('msg-input').value.trim();
+    if (!text || !currentUser || !currentChatId) return;
+    
+    if (currentChatData?.type === 'channel') {
+        let isAdmin = isChannelAdmin(currentChatData, currentUser.nick);
+        if (!isAdmin) {
+            alert('Вы не можете писать в этот канал (только админы)');
+            return;
+        }
+    }
+    
+    db.ref('messages/' + currentChatId).push({
+        text: text,
+        sender: currentUser.nick,
+        time: Date.now()
+    }).then(() => {
+        document.getElementById('msg-input').value = '';
+    }).catch(e => {
+        console.error('Ошибка:', e);
+        alert('Ошибка отправки: ' + e.message);
+    });
+};
+
+// СПИСОК УЧАСТНИКОВ
+document.getElementById('chat-title').onclick = () => {
+    if (!currentChatId || !currentChatData) return;
+    
+    let members = currentChatData.members || [];
+    let admins = currentChatData.admins || [];
+    let title = currentChatData.type === 'channel' ? '📢 Подписчики канала' : '👥 Участники группы';
+    document.getElementById('subscribers-title').textContent = title;
+    
+    let listDiv = document.getElementById('subscribers-list');
+    let canManage = (currentChatData.type === 'channel' && isChannelAdmin(currentChatData, currentUser.nick));
+    
+    listDiv.innerHTML = members.map(nick => {
+        let isAdmin = admins.includes(nick) || currentChatData.owner === nick;
+        
+        return `
+            <div class="subscriber-item">
+                <div>
+                    <span class="nick">${nick}</span>
+                    ${isAdmin ? '<span class="badge">Админ</span>' : ''}
+                </div>
+                ${canManage && nick !== currentUser.nick ? `
+                    <div>
+                        ${!isAdmin ? `<button class="green" onclick="makeAdmin('${nick}')">+ Админ</button>` : ''}
+                        ${isAdmin && nick !== currentChatData.owner ? `<button onclick="removeAdmin('${nick}')">- Админ</button>` : ''}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    if (members.length === 0) listDiv.innerHTML = '<p style="text-align:center;padding:20px">Нет участников</p>';
+    document.getElementById('subscribers-modal').style.display = 'flex';
+};
+
+window.makeAdmin = function(nick) {
+    if (!currentChatId || !currentChatData) return;
+    db.ref('chats/' + currentChatId + '/admins').once('value').then(s => {
+        let admins = s.val() || [];
+        if (!admins.includes(nick)) {
+            admins.push(nick);
+            db.ref('chats/' + currentChatId + '/admins').set(admins).then(() => {
+                currentChatData.admins = admins;
+                alert(`${nick} теперь админ`);
+                document.getElementById('chat-title').click();
+            });
+        }
+    });
+};
+
+window.removeAdmin = function(nick) {
+    if (!currentChatId || !currentChatData) return;
+    if (currentChatData.owner === nick) {
+        alert('Нельзя снять права с владельца');
+        return;
+    }
+    db.ref('chats/' + currentChatId + '/admins').once('value').then(s => {
+        let admins = s.val() || [];
+        if (admins.includes(nick)) {
+            admins = admins.filter(a => a !== nick);
+            db.ref('chats/' + currentChatId + '/admins').set(admins).then(() => {
+                currentChatData.admins = admins;
+                alert(`У ${nick} сняты права админа`);
+                document.getElementById('chat-title').click();
+            });
+        }
+    });
+};
+
+document.getElementById('close-subscribers').onclick = () => document.getElementById('subscribers-modal').style.display = 'none';
+
+// МЕНЮ
+let menuOpen = false;
+document.getElementById('fab-btn').onclick = (e) => {
+    e.stopPropagation();
+    menuOpen = !menuOpen;
+    document.getElementById('menu-panel').style.display = menuOpen ? 'block' : 'none';
+};
+document.addEventListener('click', () => {
+    menuOpen = false;
+    document.getElementById('menu-panel').style.display = 'none';
+});
+
+document.getElementById('menu-create-group').onclick = () => {
+    document.getElementById('menu-panel').style.display = 'none';
+    document.getElementById('group-modal').style.display = 'flex';
+};
+document.getElementById('close-group-modal').onclick = () => document.getElementById('group-modal').style.display = 'none';
+document.getElementById('confirm-group').onclick = () => {
+    let name = document.getElementById('group-name').value.trim();
+    let code = document.getElementById('group-code').value.trim();
+    if (!name || !code) { alert('Заполните поля'); return; }
+    let id = 'group_' + Date.now();
+    db.ref('chats/' + id).set({
+        type: 'group',
+        name: name,
+        owner: currentUser.nick,
+        members: [currentUser.nick],
+        inviteCode: code,
+        created: Date.now()
+    }).then(() => {
+        alert('Группа создана! Код: ' + code);
+        document.getElementById('group-modal').style.display = 'none';
+        document.getElementById('group-name').value = '';
+        document.getElementById('group-code').value = '';
+        loadChats();
+    });
+};
+
+document.getElementById('menu-join-group').onclick = () => {
+    document.getElementById('menu-panel').style.display = 'none';
+    document.getElementById('join-group-modal').style.display = 'flex';
+};
+document.getElementById('close-join-group-modal').onclick = () => document.getElementById('join-group-modal').style.display = 'none';
+document.getElementById('confirm-join-group').onclick = () => {
+    let code = document.getElementById('join-group-code').value.trim();
+    if (!code) { alert('Введите код'); return; }
+    db.ref('chats').orderByChild('inviteCode').equalTo(code).once('value').then(snap => {
+        let found = null;
+        snap.forEach(c => { if (c.val().type === 'group') found = { id: c.key, data: c.val() }; });
+        if (found) {
+            let members = found.data.members || [];
+            if (!members.includes(currentUser.nick)) {
+                members.push(currentUser.nick);
+                db.ref('chats/' + found.id).update({ members: members }).then(() => {
+                    alert('Вы вступили в группу!');
+                    document.getElementById('join-group-modal').style.display = 'none';
+                    document.getElementById('join-group-code').value = '';
+                    loadChats();
+                });
+            } else alert('Вы уже в группе');
+        } else alert('Код не найден');
+    });
+};
+
+// ЗАПУСК
+let savedUser = localStorage.getItem('currentUser');
+if (savedUser) {
+    currentUser = JSON.parse(savedUser);
+    showChatsScreen();
+    createOfficialChannel();
+    setTimeout(() => addUserToChannel(currentUser.nick), 500);
+} else {
+    showLoginScreen();
+}
+</script>
+</body></html>
