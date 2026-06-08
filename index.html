@@ -22,6 +22,7 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .message{background:#0084ff;color:#fff;padding:10px 15px;border-radius:18px;margin:5px 0;max-width:80%;word-wrap:break-word}
 .message-mine{background:#e0e0e0;color:#000;margin-left:auto}
 .message-ai{background:#9c27b0;color:#fff}
+.message-system{background:#666;color:#fff}
 .sender{font-size:11px;opacity:0.7;margin-bottom:3px}
 .time{font-size:10px;opacity:0.6;text-align:right;margin-top:3px}
 .input-area{display:flex;padding:10px;background:#fff;border-top:1px solid #ddd;gap:8px}
@@ -58,7 +59,8 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee}
 .user-item button{background:#f44336;color:#fff;border:none;padding:4px 12px;border-radius:15px;cursor:pointer}
 .typing-status{font-size:12px;color:#666;padding:5px 15px;background:#fff;border-bottom:1px solid #ddd}
-.loading-dots{display:inline-block;animation:dots 1.5s steps(4,end) infinite}@keyframes dots{0%,20%{opacity:0}40%{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.thinking{animation:pulse 1s infinite}
 </style></head><body>
 
 <div id="login-screen" class="screen active">
@@ -230,22 +232,14 @@ async function askAI(question) {
     
     try {
         const response = await puter.ai.chat(question, {
-            model: 'gpt-4.1-nano'
+            model: 'gpt-4.1-nano',
+            max_tokens: 500
         });
         return response;
     } catch(e) {
         console.error('AI ошибка:', e);
         return '❌ Ошибка AI. Попробуй позже.';
     }
-}
-
-async function sendBotMessage(chatId, text, isAI = true) {
-    await db.ref('messages/' + chatId).push({
-        text: text,
-        sender: isAI ? '🤖 AI Бот' : '📢 Система',
-        time: Date.now(),
-        isBot: true
-    });
 }
 
 // ========== ВХОД ==========
@@ -319,6 +313,7 @@ function showProfileScreen() {
 
 document.getElementById('back-btn').onclick = () => {
     if (window._msgRef) window._msgRef.off();
+    if (window._typingRef) window._typingRef.off();
     currentChatId = null;
     showChatsScreen();
 };
@@ -423,7 +418,9 @@ document.getElementById('msg-input').addEventListener('input', () => {
 });
 
 function showTypingStatus(chatId) {
-    db.ref('typing/' + chatId).on('value', (snap) => {
+    if (window._typingRef) window._typingRef.off();
+    window._typingRef = db.ref('typing/' + chatId);
+    window._typingRef.on('value', (snap) => {
         let typingDiv = document.getElementById('typing-status');
         if (!typingDiv) return;
         let typingUsers = [];
@@ -573,7 +570,8 @@ function loadMessages(chatId) {
             let isAI = msg.sender === '🤖 AI Бот';
             let msgDiv = document.createElement('div');
             msgDiv.className = `message ${isMine ? 'message-mine' : isAI ? 'message-ai' : ''}`;
-            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            let thinkingClass = msg.isThinking ? ' thinking' : '';
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div><div class="${thinkingClass}">${msg.text || ''}</div><div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
             div.appendChild(msgDiv);
         });
         if (count === 0) div.innerHTML = '<div style="text-align:center;padding:20px">💬 Нет сообщений</div>';
@@ -588,7 +586,8 @@ function loadMessages(chatId) {
             let msgDiv = document.createElement('div');
             msgDiv.setAttribute('data-msg-key', snapshot.key);
             msgDiv.className = `message ${isMine ? 'message-mine' : isAI ? 'message-ai' : ''}`;
-            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            let thinkingClass = msg.isThinking ? ' thinking' : '';
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div><div class="${thinkingClass}">${msg.text || ''}</div><div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
             div.appendChild(msgDiv);
             div.scrollTop = div.scrollHeight;
         }
@@ -600,12 +599,16 @@ document.getElementById('send-btn').onclick = async () => {
     let text = document.getElementById('msg-input').value.trim();
     if (!text || !currentUser || !currentChatId) return;
     
+    // Проверка прав для канала
     if (currentChatData?.type === 'channel') {
         let isAdmin = isChannelAdmin(currentChatData, currentUser.nick);
-        if (!isAdmin) { alert('Вы не можете писать в этот канал'); return; }
+        if (!isAdmin) {
+            alert('Вы не можете писать в этот канал (только админы)');
+            return;
+        }
     }
     
-    // Отправляем сообщение пользователя
+    // 1. Отправляем сообщение пользователя
     await db.ref('messages/' + currentChatId).push({
         text: text,
         sender: currentUser.nick,
@@ -613,26 +616,32 @@ document.getElementById('send-btn').onclick = async () => {
     });
     document.getElementById('msg-input').value = '';
     
-    // Если это чат с AI — отвечаем автоматически
+    // 2. Если это чат с AI — отправляем "Думаю..." и потом ответ
     if (currentChatData?.type === 'ai') {
-        let thinkingMsg = await db.ref('messages/' + currentChatId).push({
+        // Отправляем сообщение "Думаю..."
+        const thinkingRef = await db.ref('messages/' + currentChatId).push({
             text: '🤔 Думаю...',
             sender: '🤖 AI Бот',
             time: Date.now(),
-            isTemp: true
+            isThinking: true
         });
         
-        let answer = await askAI(text);
-        
-        // Удаляем сообщение "Думаю..."
-        if (thinkingMsg) await db.ref('messages/' + currentChatId + '/' + thinkingMsg.key).remove();
-        
-        // Отправляем ответ
-        await db.ref('messages/' + currentChatId).push({
-            text: answer,
-            sender: '🤖 AI Бот',
-            time: Date.now()
-        });
+        try {
+            // Получаем ответ от AI
+            const answer = await askAI(text);
+            
+            // Обновляем сообщение "Думаю..." на реальный ответ
+            await db.ref('messages/' + currentChatId + '/' + thinkingRef.key).update({
+                text: answer,
+                isThinking: false
+            });
+        } catch (error) {
+            console.error('AI ошибка:', error);
+            await db.ref('messages/' + currentChatId + '/' + thinkingRef.key).update({
+                text: '❌ Ошибка AI. Попробуй позже.',
+                isThinking: false
+            });
+        }
     }
 };
 
