@@ -6,6 +6,7 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .screen.active{display:flex}
 .header{background:#0084ff;color:#fff;padding:15px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
 .header button{background:rgba(255,255,255,0.2);color:#fff;border:none;padding:8px 15px;border-radius:20px;cursor:pointer}
+.header .channel-title{background:none;border:none;color:#fff;font-size:17px;font-weight:600;padding:0;cursor:pointer}
 #login-box{background:#fff;padding:30px;border-radius:15px;text-align:center;width:85%;max-width:350px;margin:auto}
 #login-box input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:10px;font-size:16px}
 #login-box button{width:100%;padding:12px;margin-top:10px;background:#0084ff;color:#fff;border:none;border-radius:10px;font-size:18px;cursor:pointer}
@@ -47,6 +48,11 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .white-btn-red{background:#fff;color:#c62828;border:2px solid #f44336;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
 .white-btn-orange{background:#fff;color:#e65100;border:2px solid #ff9800;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
 .white-btn-gray{background:#fff;color:#616161;border:2px solid #9e9e9e;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
+.subscriber-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee}
+.subscriber-item .nick{font-weight:600}
+.subscriber-item .badge{background:#ff9800;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:8px}
+.subscriber-item button{background:#f44336;color:#fff;border:none;padding:5px 12px;border-radius:15px;margin-left:8px;cursor:pointer}
+.subscriber-item button.green{background:#4caf50}
 </style></head><body>
 
 <div id="login-screen" class="screen active">
@@ -69,7 +75,7 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 </div>
 
 <div id="chat-screen" class="screen">
-<div class="header"><button id="back-btn">← Назад</button><span id="chat-title">Чат</span><span></span></div>
+<div class="header"><button id="back-btn">← Назад</button><button class="channel-title" id="channel-title-btn">Официальный канал</button><span></span></div>
 <div id="messages"></div>
 <div class="input-area"><input type="text" id="msg-input" placeholder="Сообщение..."><button id="send-btn">📨 Отпр</button></div>
 </div>
@@ -93,6 +99,8 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 </div>
 </div>
 
+<div id="subscribers-modal" class="modal"><div class="modal-content"><h3 id="subscribers-title">Участники</h3><div id="subscribers-list"></div><button id="close-subscribers">Закрыть</button></div></div>
+
 <div id="group-modal" class="modal"><div class="modal-content"><h3>👥 Создать группу</h3><input type="text" id="group-name" placeholder="Название"><input type="text" id="group-code" placeholder="Код"><button id="confirm-group">Создать</button><button id="close-group-modal">Отмена</button></div></div>
 <div id="join-group-modal" class="modal"><div class="modal-content"><h3>🔗 Вступить в группу</h3><input type="text" id="join-group-code" placeholder="Код"><button id="confirm-join-group">Вступить</button><button id="close-join-group-modal">Отмена</button></div></div>
 
@@ -113,10 +121,10 @@ const db = firebase.database();
 let currentUser = null;
 let currentChatId = null;
 let currentChatData = null;
-let messagesLoading = false;
 const MAIN_ADMINS = ['Чупик', 'Чокопай'];
 
 function isMainAdmin(nick) { return MAIN_ADMINS.includes(nick); }
+function isChannelAdmin(chatData, nick) { return chatData?.admins?.includes(nick) || chatData?.owner === nick || isMainAdmin(nick); }
 
 // ТЁМНАЯ ТЕМА
 if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
@@ -360,23 +368,22 @@ function openChat(chatId, chatData) {
     if (window._msgRef) window._msgRef.off();
     currentChatId = chatId;
     currentChatData = chatData;
-    document.getElementById('chat-title').innerText = chatData.name || (chatData.type === 'channel' ? 'Официальный канал' : 'Группа');
+    document.getElementById('channel-title-btn').innerText = chatData.name || (chatData.type === 'channel' ? 'Официальный канал' : 'Группа');
     document.getElementById('messages').innerHTML = '';
     showChatScreen();
     
-    let isAdmin = chatData.type === 'channel' && (chatData.admins?.includes(currentUser.nick) || chatData.owner === currentUser.nick || isMainAdmin(currentUser.nick));
+    let isAdmin = chatData.type === 'channel' && isChannelAdmin(chatData, currentUser.nick);
     let inputArea = document.querySelector('#chat-screen .input-area');
     if (inputArea) inputArea.style.display = (chatData.type === 'group' || isAdmin) ? 'flex' : 'none';
     
     loadMessages(chatId);
 }
 
-// ЗАГРУЗКА СООБЩЕНИЙ - ИСПРАВЛЕНА
+// ЗАГРУЗКА СООБЩЕНИЙ
 function loadMessages(chatId) {
     let div = document.getElementById('messages');
     div.innerHTML = '<div style="text-align:center;padding:20px">⏳ Загрузка...</div>';
     
-    // Получаем все сообщения
     db.ref('messages/' + chatId).once('value').then(snapshot => {
         div.innerHTML = '';
         let count = 0;
@@ -397,9 +404,7 @@ function loadMessages(chatId) {
         div.scrollTop = div.scrollHeight;
     });
     
-    // Слушаем новые сообщения
     db.ref('messages/' + chatId).on('child_added', snapshot => {
-        // Проверяем, не загрузили ли мы уже это сообщение
         let existing = document.querySelector(`[data-msg-key="${snapshot.key}"]`);
         if (!existing) {
             let msg = snapshot.val();
@@ -414,32 +419,102 @@ function loadMessages(chatId) {
     });
 }
 
-// ОТПРАВКА - ИСПРАВЛЕНА
+// ОТПРАВКА
 document.getElementById('send-btn').onclick = () => {
     let text = document.getElementById('msg-input').value.trim();
     if (!text || !currentUser || !currentChatId) return;
     
     if (currentChatData?.type === 'channel') {
-        let isAdmin = currentChatData.admins?.includes(currentUser.nick) || currentChatData.owner === currentUser.nick || isMainAdmin(currentUser.nick);
+        let isAdmin = isChannelAdmin(currentChatData, currentUser.nick);
         if (!isAdmin) {
             alert('Вы не можете писать в этот канал (только админы)');
             return;
         }
     }
     
-    // Используем push - каждый раз создаётся новый уникальный ключ
     db.ref('messages/' + currentChatId).push({
         text: text,
         sender: currentUser.nick,
         time: Date.now()
     }).then(() => {
         document.getElementById('msg-input').value = '';
-        console.log('Сообщение отправлено');
     }).catch(e => {
         console.error('Ошибка:', e);
         alert('Ошибка отправки: ' + e.message);
     });
 };
+
+// ========== СПИСОК УЧАСТНИКОВ И НАЗНАЧЕНИЕ АДМИНОВ ==========
+document.getElementById('channel-title-btn').onclick = () => {
+    if (!currentChatId || !currentChatData) return;
+    
+    let members = currentChatData.members || [];
+    let admins = currentChatData.admins || [];
+    let title = currentChatData.type === 'channel' ? '📢 Подписчики канала' : '👥 Участники группы';
+    document.getElementById('subscribers-title').textContent = title;
+    
+    let listDiv = document.getElementById('subscribers-list');
+    let isChannelCreator = currentChatData.type === 'channel' && isChannelAdmin(currentChatData, currentUser.nick);
+    
+    listDiv.innerHTML = members.map(nick => {
+        let isAdmin = admins.includes(nick) || currentChatData.owner === nick;
+        let canManage = isChannelCreator && nick !== currentUser.nick;
+        
+        return `
+            <div class="subscriber-item">
+                <div>
+                    <span class="nick">${nick}</span>
+                    ${isAdmin ? '<span class="badge">Админ</span>' : ''}
+                </div>
+                ${canManage ? `
+                    <div>
+                        ${!isAdmin ? `<button class="green" onclick="makeAdmin('${nick}')">+ Админ</button>` : ''}
+                        ${isAdmin && nick !== currentChatData.owner ? `<button onclick="removeAdmin('${nick}')">- Админ</button>` : ''}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    if (members.length === 0) listDiv.innerHTML = '<p style="text-align:center;padding:20px">Нет участников</p>';
+    document.getElementById('subscribers-modal').style.display = 'flex';
+};
+
+window.makeAdmin = function(nick) {
+    if (!currentChatId || !currentChatData) return;
+    db.ref('chats/' + currentChatId + '/admins').once('value').then(s => {
+        let admins = s.val() || [];
+        if (!admins.includes(nick)) {
+            admins.push(nick);
+            db.ref('chats/' + currentChatId + '/admins').set(admins).then(() => {
+                currentChatData.admins = admins;
+                alert(`${nick} теперь админ канала`);
+                document.getElementById('channel-title-btn').click();
+            });
+        }
+    });
+};
+
+window.removeAdmin = function(nick) {
+    if (!currentChatId || !currentChatData) return;
+    if (currentChatData.owner === nick) {
+        alert('Нельзя снять права с владельца канала');
+        return;
+    }
+    db.ref('chats/' + currentChatId + '/admins').once('value').then(s => {
+        let admins = s.val() || [];
+        if (admins.includes(nick)) {
+            admins = admins.filter(a => a !== nick);
+            db.ref('chats/' + currentChatId + '/admins').set(admins).then(() => {
+                currentChatData.admins = admins;
+                alert(`У ${nick} сняты права админа`);
+                document.getElementById('channel-title-btn').click();
+            });
+        }
+    });
+};
+
+document.getElementById('close-subscribers').onclick = () => document.getElementById('subscribers-modal').style.display = 'none';
 
 // МЕНЮ
 let menuOpen = false;
