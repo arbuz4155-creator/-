@@ -113,6 +113,7 @@ const db = firebase.database();
 let currentUser = null;
 let currentChatId = null;
 let currentChatData = null;
+let messagesLoading = false;
 const MAIN_ADMINS = ['Чупик', 'Чокопай'];
 
 function isMainAdmin(nick) { return MAIN_ADMINS.includes(nick); }
@@ -356,63 +357,64 @@ function loadChats() {
 
 // ОТКРЫТЬ ЧАТ
 function openChat(chatId, chatData) {
+    if (window._msgRef) window._msgRef.off();
     currentChatId = chatId;
     currentChatData = chatData;
     document.getElementById('chat-title').innerText = chatData.name || (chatData.type === 'channel' ? 'Официальный канал' : 'Группа');
     document.getElementById('messages').innerHTML = '';
     showChatScreen();
-    loadMessages(chatId);
     
     let isAdmin = chatData.type === 'channel' && (chatData.admins?.includes(currentUser.nick) || chatData.owner === currentUser.nick || isMainAdmin(currentUser.nick));
     let inputArea = document.querySelector('#chat-screen .input-area');
     if (inputArea) inputArea.style.display = (chatData.type === 'group' || isAdmin) ? 'flex' : 'none';
+    
+    loadMessages(chatId);
 }
 
-// ЗАГРУЗКА СООБЩЕНИЙ (ИСПРАВЛЕНО)
-let messagesLoaded = false;
+// ЗАГРУЗКА СООБЩЕНИЙ - ИСПРАВЛЕНА
 function loadMessages(chatId) {
     let div = document.getElementById('messages');
     div.innerHTML = '<div style="text-align:center;padding:20px">⏳ Загрузка...</div>';
-    messagesLoaded = false;
     
-    if (window._msgRef) window._msgRef.off();
-    window._msgRef = db.ref('messages/' + chatId);
-    
-    // Загружаем ВСЕ сообщения
-    window._msgRef.once('value', snap => {
+    // Получаем все сообщения
+    db.ref('messages/' + chatId).once('value').then(snapshot => {
         div.innerHTML = '';
-        let msgs = [];
-        snap.forEach(c => msgs.push({ key: c.key, val: c.val() }));
+        let count = 0;
         
-        if (msgs.length === 0) {
+        snapshot.forEach(child => {
+            count++;
+            let msg = child.val();
+            let isMine = currentUser && msg.sender === currentUser.nick;
+            let msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isMine ? 'message-mine' : ''}`;
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            div.appendChild(msgDiv);
+        });
+        
+        if (count === 0) {
             div.innerHTML = '<div style="text-align:center;padding:20px">💬 Нет сообщений</div>';
-        } else {
-            msgs.forEach(m => displayMessage(m.key, m.val, div));
         }
-        messagesLoaded = true;
         div.scrollTop = div.scrollHeight;
     });
     
-    // Слушаем новые
-    window._msgRef.on('child_added', snap => {
-        if (messagesLoaded) {
-            let msg = snap.val();
-            if (div.innerHTML.includes('Нет сообщений')) div.innerHTML = '';
-            displayMessage(snap.key, msg, div);
+    // Слушаем новые сообщения
+    db.ref('messages/' + chatId).on('child_added', snapshot => {
+        // Проверяем, не загрузили ли мы уже это сообщение
+        let existing = document.querySelector(`[data-msg-key="${snapshot.key}"]`);
+        if (!existing) {
+            let msg = snapshot.val();
+            let isMine = currentUser && msg.sender === currentUser.nick;
+            let msgDiv = document.createElement('div');
+            msgDiv.setAttribute('data-msg-key', snapshot.key);
+            msgDiv.className = `message ${isMine ? 'message-mine' : ''}`;
+            msgDiv.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
+            div.appendChild(msgDiv);
             div.scrollTop = div.scrollHeight;
         }
     });
 }
 
-function displayMessage(key, msg, container) {
-    let isMine = currentUser && msg.sender === currentUser.nick;
-    let div = document.createElement('div');
-    div.className = `message ${isMine ? 'message-mine' : ''}`;
-    div.innerHTML = `<div class="sender">${msg.sender || '?'}</div>${msg.text || ''}<div class="time">${new Date(msg.time || Date.now()).toLocaleTimeString().slice(0,5)}</div>`;
-    container.appendChild(div);
-}
-
-// ОТПРАВКА
+// ОТПРАВКА - ИСПРАВЛЕНА
 document.getElementById('send-btn').onclick = () => {
     let text = document.getElementById('msg-input').value.trim();
     if (!text || !currentUser || !currentChatId) return;
@@ -425,13 +427,18 @@ document.getElementById('send-btn').onclick = () => {
         }
     }
     
+    // Используем push - каждый раз создаётся новый уникальный ключ
     db.ref('messages/' + currentChatId).push({
         text: text,
         sender: currentUser.nick,
         time: Date.now()
     }).then(() => {
         document.getElementById('msg-input').value = '';
-    }).catch(e => alert('Ошибка: ' + e.message));
+        console.log('Сообщение отправлено');
+    }).catch(e => {
+        console.error('Ошибка:', e);
+        alert('Ошибка отправки: ' + e.message);
+    });
 };
 
 // МЕНЮ
