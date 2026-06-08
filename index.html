@@ -237,7 +237,7 @@ document.getElementById('logout-btn').onclick = () => {
     showLoginScreen();
 };
 
-// ПРОФИЛЬ
+// ПРОФИЛЬ - СМЕНА НИКА С ПРОВЕРКОЙ
 document.getElementById('avatar-img').onclick = () => document.getElementById('avatar-file').click();
 document.getElementById('avatar-file').onchange = function() {
     let f = this.files[0];
@@ -252,17 +252,74 @@ document.getElementById('avatar-file').onchange = function() {
     };
     r.readAsDataURL(f);
 };
+
 document.getElementById('save-nick-btn').onclick = () => {
-    let nn = document.getElementById('new-nick').value.trim();
-    if (!nn || nn === currentUser.nick) return;
-    db.ref('users/' + currentUser.nick).once('value').then(s => {
-        let d = s.val();
-        db.ref('users/' + nn).set({ pass: d.pass, avatar: d.avatar || '' });
-        db.ref('users/' + currentUser.nick).remove();
-        currentUser.nick = nn;
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        alert('Ник изменён!');
-        document.getElementById('profile-nick').textContent = nn;
+    let newNick = document.getElementById('new-nick').value.trim();
+    if (!newNick || newNick === currentUser.nick) return;
+    
+    // Проверяем, существует ли уже такой ник у ДРУГОГО пользователя
+    db.ref('users/' + newNick).once('value').then(snap => {
+        if (snap.exists() && snap.key !== currentUser.nick) {
+            alert('❌ Этот ник уже занят другим пользователем!');
+            return;
+        }
+        
+        let oldNick = currentUser.nick;
+        
+        // 1. Сохраняем данные пользователя
+        db.ref('users/' + oldNick).once('value').then(s => {
+            let userData = s.val();
+            
+            // 2. Создаём запись с новым ником
+            db.ref('users/' + newNick).set({
+                pass: userData.pass,
+                avatar: userData.avatar || ''
+            }).then(() => {
+                // 3. Удаляем старую запись
+                db.ref('users/' + oldNick).remove();
+                
+                // 4. Обновляем чаты
+                db.ref('chats').once('value').then(chats => {
+                    chats.forEach(chat => {
+                        let members = chat.val().members || [];
+                        if (members.includes(oldNick)) {
+                            let newMembers = members.map(m => m === oldNick ? newNick : m);
+                            db.ref('chats/' + chat.key + '/members').set(newMembers);
+                        }
+                        if (chat.val().owner === oldNick) {
+                            db.ref('chats/' + chat.key + '/owner').set(newNick);
+                        }
+                        let admins = chat.val().admins || [];
+                        if (admins.includes(oldNick)) {
+                            let newAdmins = admins.map(a => a === oldNick ? newNick : a);
+                            db.ref('chats/' + chat.key + '/admins').set(newAdmins);
+                        }
+                    });
+                });
+                
+                // 5. Обновляем сообщения
+                db.ref('messages').once('value').then(messages => {
+                    messages.forEach(chatMsgs => {
+                        chatMsgs.forEach(msg => {
+                            let msgData = msg.val();
+                            if (msgData.sender === oldNick) {
+                                db.ref('messages/' + chatMsgs.key + '/' + msg.key + '/sender').set(newNick);
+                            }
+                        });
+                    });
+                });
+                
+                // 6. Обновляем текущего пользователя
+                currentUser.nick = newNick;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                alert('✅ Ник изменён на ' + newNick);
+                document.getElementById('profile-nick').textContent = newNick;
+                document.getElementById('new-nick').value = newNick;
+                loadChats();
+                location.reload(); // Перезагружаем чтобы обновить все данные
+            });
+        });
     });
 };
 
@@ -444,9 +501,15 @@ document.getElementById('send-btn').onclick = () => {
     });
 };
 
-// ========== СПИСОК УЧАСТНИКОВ И НАЗНАЧЕНИЕ АДМИНОВ ==========
+// СПИСОК УЧАСТНИКОВ И НАЗНАЧЕНИЕ АДМИНОВ
 document.getElementById('channel-title-btn').onclick = () => {
     if (!currentChatId || !currentChatData) return;
+    
+    let canView = isChannelAdmin(currentChatData, currentUser.nick);
+    if (!canView) {
+        alert('Просмотр списка участников доступен только админам канала');
+        return;
+    }
     
     let members = currentChatData.members || [];
     let admins = currentChatData.admins || [];
@@ -454,11 +517,10 @@ document.getElementById('channel-title-btn').onclick = () => {
     document.getElementById('subscribers-title').textContent = title;
     
     let listDiv = document.getElementById('subscribers-list');
-    let isChannelCreator = currentChatData.type === 'channel' && isChannelAdmin(currentChatData, currentUser.nick);
+    let canManage = isChannelAdmin(currentChatData, currentUser.nick);
     
     listDiv.innerHTML = members.map(nick => {
         let isAdmin = admins.includes(nick) || currentChatData.owner === nick;
-        let canManage = isChannelCreator && nick !== currentUser.nick;
         
         return `
             <div class="subscriber-item">
@@ -466,7 +528,7 @@ document.getElementById('channel-title-btn').onclick = () => {
                     <span class="nick">${nick}</span>
                     ${isAdmin ? '<span class="badge">Админ</span>' : ''}
                 </div>
-                ${canManage ? `
+                ${canManage && nick !== currentUser.nick ? `
                     <div>
                         ${!isAdmin ? `<button class="green" onclick="makeAdmin('${nick}')">+ Админ</button>` : ''}
                         ${isAdmin && nick !== currentChatData.owner ? `<button onclick="removeAdmin('${nick}')">- Админ</button>` : ''}
