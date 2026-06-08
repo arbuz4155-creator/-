@@ -28,7 +28,6 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .fab:active{transform:scale(0.95)}
 .menu-panel{position:fixed;bottom:90px;right:20px;background:#fff;border-radius:20px;padding:8px 0;min-width:190px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:101;display:none}
 .menu-panel button{width:100%;padding:14px 20px;border:none;background:none;text-align:left;font-size:16px;cursor:pointer}
-.menu-panel button:hover{background:#f0f0f0}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:200}
 .modal-content{background:#fff;border-radius:20px;padding:20px;width:85%;max-width:320px;text-align:center}
 .modal-content input{width:100%;padding:12px;margin:10px 0;border:1px solid #ddd;border-radius:10px;font-size:16px}
@@ -50,7 +49,6 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 .white-btn-gray{background:#fff;color:#616161;border:2px solid #9e9e9e;padding:10px;border-radius:8px;width:100%;cursor:pointer;font-weight:600;margin:5px 0}
 </style></head><body>
 
-<!-- ЭКРАН ВХОДА -->
 <div id="login-screen" class="screen active">
 <div id="login-box">
 <h1>🔐 Вход</h1>
@@ -60,7 +58,6 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 </div>
 </div>
 
-<!-- ЭКРАН ЧАТОВ -->
 <div id="chats-screen" class="screen">
 <div class="header"><span>📱 Мессенджер</span><button id="to-profile-btn">Профиль</button></div>
 <div id="chats-list">Загрузка...</div>
@@ -71,14 +68,12 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 </div>
 </div>
 
-<!-- ЭКРАН ЧАТА -->
 <div id="chat-screen" class="screen">
 <div class="header"><button id="back-btn">← Назад</button><span id="chat-title">Чат</span><span></span></div>
 <div id="messages"></div>
 <div class="input-area"><input type="text" id="msg-input" placeholder="Сообщение..."><button id="send-btn">📨 Отпр</button></div>
 </div>
 
-<!-- ЭКРАН ПРОФИЛЯ -->
 <div id="profile-screen" class="screen">
 <div class="header"><button id="profile-back-btn">← Назад</button><span>Профиль</span><button id="logout-btn">Выйти</button></div>
 <div class="profile-content">
@@ -98,7 +93,6 @@ body{font-family:sans-serif;background:#f0f0f0;height:100vh;display:flex;flex-di
 </div>
 </div>
 
-<!-- МОДАЛЬНЫЕ ОКНА ГРУПП -->
 <div id="group-modal" class="modal"><div class="modal-content"><h3>👥 Создать группу</h3><input type="text" id="group-name" placeholder="Название"><input type="text" id="group-code" placeholder="Код"><button id="confirm-group">Создать</button><button id="close-group-modal">Отмена</button></div></div>
 <div id="join-group-modal" class="modal"><div class="modal-content"><h3>🔗 Вступить в группу</h3><input type="text" id="join-group-code" placeholder="Код"><button id="confirm-join-group">Вступить</button><button id="close-join-group-modal">Отмена</button></div></div>
 
@@ -123,7 +117,7 @@ const MAIN_ADMINS = ['Чупик', 'Чокопай'];
 
 function isMainAdmin(nick) { return MAIN_ADMINS.includes(nick); }
 
-// ========== ТЁМНАЯ ТЕМА ==========
+// ТЁМНАЯ ТЕМА
 if (localStorage.getItem('dark') === 'true') document.body.classList.add('dark');
 document.getElementById('theme-toggle').onclick = function() {
     document.body.classList.toggle('dark');
@@ -131,7 +125,7 @@ document.getElementById('theme-toggle').onclick = function() {
     this.classList.toggle('active', document.body.classList.contains('dark'));
 };
 
-// ========== СОЗДАНИЕ ОФИЦИАЛЬНОГО КАНАЛА ==========
+// ОФИЦИАЛЬНЫЙ КАНАЛ
 function createOfficialChannel() {
     db.ref('chats/official_channel').once('value').then(snap => {
         if (!snap.exists()) {
@@ -158,7 +152,7 @@ function addUserToChannel(nick) {
     });
 }
 
-// ========== ВХОД ==========
+// ВХОД
 document.getElementById('login-btn').onclick = () => {
     let nick = document.getElementById('login-nick').value.trim();
     let pass = document.getElementById('login-pass').value.trim();
@@ -186,7 +180,7 @@ function afterLogin() {
     showChatsScreen();
 }
 
-// ========== ЭКРАНЫ ==========
+// ЭКРАНЫ
 function showLoginScreen() {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('login-screen').classList.add('active');
@@ -234,7 +228,7 @@ document.getElementById('logout-btn').onclick = () => {
     showLoginScreen();
 };
 
-// ========== ПРОФИЛЬ ==========
+// ПРОФИЛЬ
 document.getElementById('avatar-img').onclick = () => document.getElementById('avatar-file').click();
 document.getElementById('avatar-file').onchange = function() {
     let f = this.files[0];
@@ -263,7 +257,7 @@ document.getElementById('save-nick-btn').onclick = () => {
     });
 };
 
-// ========== АДМИН-ФУНКЦИИ ==========
+// АДМИН
 async function loadStats() {
     let users = 0, groups = 0;
     await db.ref('users').once('value', s => users = s.numChildren());
@@ -297,7 +291,7 @@ document.getElementById('delete-btn')?.addEventListener('click', async () => {
     let sel = document.getElementById('delete-select');
     let id = sel.value;
     if (!id || id === 'Выберите группу') { alert('Выберите группу'); return; }
-    if (confirm('Удалить группу? Все сообщения будут удалены!')) {
+    if (confirm('Удалить группу?')) {
         await db.ref('messages/' + id).remove();
         await db.ref('chats/' + id).remove();
         alert('Группа удалена');
@@ -307,7 +301,7 @@ document.getElementById('delete-btn')?.addEventListener('click', async () => {
     }
 });
 
-// ========== ОБОИ ==========
+// ОБОИ
 document.getElementById('set-wallpaper-btn')?.addEventListener('click', () => {
     let url = prompt('Вставьте прямую ссылку на картинку:');
     if (url && url.startsWith('http')) {
@@ -332,7 +326,7 @@ db.ref('settings/wallpaper').on('value', s => {
     }
 });
 
-// ========== ЗАГРУЗКА ЧАТОВ ==========
+// ЗАГРУЗКА ЧАТОВ
 function loadChats() {
     if (!currentUser) return;
     db.ref('chats').once('value').then(snap => {
@@ -360,7 +354,7 @@ function loadChats() {
     });
 }
 
-// ========== ОТКРЫТЬ ЧАТ ==========
+// ОТКРЫТЬ ЧАТ
 function openChat(chatId, chatData) {
     currentChatId = chatId;
     currentChatData = chatData;
@@ -369,13 +363,12 @@ function openChat(chatId, chatData) {
     showChatScreen();
     loadMessages(chatId);
     
-    // Проверка прав для канала
     let isAdmin = chatData.type === 'channel' && (chatData.admins?.includes(currentUser.nick) || chatData.owner === currentUser.nick || isMainAdmin(currentUser.nick));
     let inputArea = document.querySelector('#chat-screen .input-area');
     if (inputArea) inputArea.style.display = (chatData.type === 'group' || isAdmin) ? 'flex' : 'none';
 }
 
-// ========== ЗАГРУЗКА СООБЩЕНИЙ ==========
+// ЗАГРУЗКА СООБЩЕНИЙ (ИСПРАВЛЕНО)
 let messagesLoaded = false;
 function loadMessages(chatId) {
     let div = document.getElementById('messages');
@@ -385,11 +378,11 @@ function loadMessages(chatId) {
     if (window._msgRef) window._msgRef.off();
     window._msgRef = db.ref('messages/' + chatId);
     
-    window._msgRef.orderByChild('time').once('value', snap => {
+    // Загружаем ВСЕ сообщения
+    window._msgRef.once('value', snap => {
         div.innerHTML = '';
         let msgs = [];
         snap.forEach(c => msgs.push({ key: c.key, val: c.val() }));
-        msgs.sort((a, b) => (a.val.time || 0) - (b.val.time || 0));
         
         if (msgs.length === 0) {
             div.innerHTML = '<div style="text-align:center;padding:20px">💬 Нет сообщений</div>';
@@ -400,7 +393,8 @@ function loadMessages(chatId) {
         div.scrollTop = div.scrollHeight;
     });
     
-    window._msgRef.orderByChild('time').on('child_added', snap => {
+    // Слушаем новые
+    window._msgRef.on('child_added', snap => {
         if (messagesLoaded) {
             let msg = snap.val();
             if (div.innerHTML.includes('Нет сообщений')) div.innerHTML = '';
@@ -418,12 +412,11 @@ function displayMessage(key, msg, container) {
     container.appendChild(div);
 }
 
-// ========== ОТПРАВКА ==========
+// ОТПРАВКА
 document.getElementById('send-btn').onclick = () => {
     let text = document.getElementById('msg-input').value.trim();
     if (!text || !currentUser || !currentChatId) return;
     
-    // Проверка прав для канала
     if (currentChatData?.type === 'channel') {
         let isAdmin = currentChatData.admins?.includes(currentUser.nick) || currentChatData.owner === currentUser.nick || isMainAdmin(currentUser.nick);
         if (!isAdmin) {
@@ -436,11 +429,12 @@ document.getElementById('send-btn').onclick = () => {
         text: text,
         sender: currentUser.nick,
         time: Date.now()
-    });
-    document.getElementById('msg-input').value = '';
+    }).then(() => {
+        document.getElementById('msg-input').value = '';
+    }).catch(e => alert('Ошибка: ' + e.message));
 };
 
-// ========== ГРУППЫ ==========
+// МЕНЮ
 let menuOpen = false;
 document.getElementById('fab-btn').onclick = (e) => {
     e.stopPropagation();
@@ -504,7 +498,7 @@ document.getElementById('confirm-join-group').onclick = () => {
     });
 };
 
-// ========== ЗАГРУЗКА ПРИ СТАРТЕ ==========
+// ЗАПУСК
 let savedUser = localStorage.getItem('currentUser');
 if (savedUser) {
     currentUser = JSON.parse(savedUser);
