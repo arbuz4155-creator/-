@@ -35,6 +35,7 @@ let ADMINS=['Чупик','чокопай'];
 let channelDescription='Официальный канал. Пишут только админы.';
 let channelAvatar='⭐';
 const OFFICIAL_CHANNEL='Официальный канал';
+let savedAccounts=[];
 
 function isAdmin(){return ADMINS.includes(currentUser);}
 function getChatRoomName(a,b){return[a,b].sort().join('___');}
@@ -53,7 +54,7 @@ async function loadAllUsers(){const snap=await get(ref(database,'users'));const 
 async function initOfficialChannel(){const ch=await get(ref(database,'official_channel'));if(!ch.exists()){await set(ref(database,'official_channel'),{created:Date.now(),description:channelDescription,avatar:channelAvatar});}else{const desc=await get(ref(database,'official_channel/description'));if(desc.exists())channelDescription=desc.val();const av=await get(ref(database,'official_channel/avatar'));if(av.exists())channelAvatar=av.val();}}
 async function loadAdmins(){const a=await get(ref(database,'admins'));if(a.exists())ADMINS=a.val();else await set(ref(database,'admins'),ADMINS);}
 async function updateChannelDescription(newDesc){channelDescription=newDesc;await set(ref(database,'official_channel/description'),newDesc);if(currentOpenChat===OFFICIAL_CHANNEL)document.getElementById('channelDesc').textContent=channelDescription;}
-async function updateChannelAvatar(newAvatar){channelAvatar=newAvatar;await set(ref(database,'official_channel/avatar'),newAvatar);renderChatsList();if(currentOpenChat===OFFICIAL_CHANNEL){const header=document.querySelector('.chat-header-info');if(header){const avatarDiv=header.querySelector('.channel-avatar');if(avatarDiv)avatarDiv.textContent=channelAvatar;}}}
+async function updateChannelAvatar(newAvatar){channelAvatar=newAvatar;await set(ref(database,'official_channel/avatar'),newAvatar);renderChatsList();if(currentOpenChat===OFFICIAL_CHANNEL){}}
 async function changeUserNickname(oldNick,newNick){if(oldNick===newNick)return;const ex=await get(ref(database,`users/${newNick}/nick`));if(ex.exists()){alert("Ник уже занят");return false;}const ud=await get(ref(database,`users/${oldNick}`));const data=ud.val();await set(ref(database,`users/${newNick}`),{nick:newNick,avatar:data.avatar||'👤',registered:data.registered});const pd=await get(ref(database,`passwords/${oldNick}`));await set(ref(database,`passwords/${newNick}`),pd.val());await set(ref(database,`users/${oldNick}`),null);await set(ref(database,`passwords/${oldNick}`),null);const oa=getUserAvatar(oldNick);if(oa)saveUserAvatar(newNick,oa);const ob=getUserBio(oldNick);if(ob)saveUserBio(newNick,ob);const nc={};for(const r in chatsData){if(r&&r.includes(oldNick))nc[r.replace(oldNick,newNick)]=chatsData[r];else if(r)nc[r]=chatsData[r];}chatsData=nc;localStorage.setItem('chats',JSON.stringify(chatsData));for(const or in chatsData){if(or&&or.includes(oldNick)){const nr=or.replace(oldNick,newNick),rd=await get(ref(database,`chats/${or}`));if(rd.exists()){await set(ref(database,`chats/${nr}`),rd.val());await set(ref(database,`chats/${or}`),null);}}}if(ADMINS.includes(oldNick)){const idx=ADMINS.indexOf(oldNick);if(idx!==-1)ADMINS[idx]=newNick;await set(ref(database,'admins'),ADMINS);}if(currentUser===oldNick){currentUser=newNick;localStorage.setItem('currentUser',currentUser);loadUserData();}renderChatsList();alert(`Ник изменён на ${newNick}`);return true;}
 async function resetUserPassword(nick,newPass){if(!newPass||newPass.length<4){alert("Пароль должен быть не менее 4 символов");return false;}await set(ref(database,`passwords/${nick}`),newPass);alert(`Пароль для ${nick} изменён`);return true;}
 async function updateUserDescription(nick,newDesc){if(ADMINS.includes(nick) && !isAdmin()){alert("Нельзя изменить описание админа");return false;}if(newDesc&&newDesc.trim())saveUserBio(nick,newDesc.trim());else saveUserBio(nick,'');alert(`Описание для ${nick} обновлено`);return true;}
@@ -393,8 +394,7 @@ document.getElementById('searchMessagesInput').oninput=(e)=>{const q=e.target.va
 document.getElementById('closeSearchMessagesBtn').onclick=()=>{document.getElementById('searchMessagesPanel').style.display='none';document.getElementById('searchMessagesInput').value='';if(currentOpenChat===OFFICIAL_CHANNEL)renderOfficialMessages();else renderMessages();};
 document.getElementById('cancelReplyBtn').onclick=()=>{currentReplyTo=null;document.getElementById('replyPreview').style.display='none';};
 
-let savedAccounts=[];
-async function checkAndRestoreSession(){
+(async function init(){
     await loadAdmins();
     const savedUser=localStorage.getItem('currentUser');
     if(savedUser && savedUser!=='null' && savedUser!=='undefined'){
@@ -413,20 +413,16 @@ async function checkAndRestoreSession(){
             trackActivity();
             await initOfficialChannel();
             renderAccountsList();
-            return true;
+        } else {
+            localStorage.removeItem('currentUser');
+            document.getElementById('loginScreen').style.display='flex';
         }
+    } else {
+        document.getElementById('loginScreen').style.display='flex';
     }
-    return false;
-}
-
-const sessionRestored=await checkAndRestoreSession();
-if(!sessionRestored){
-    document.getElementById('loginScreen').style.display='flex';
-    const sa=localStorage.getItem('savedAccounts');
-    if(sa)savedAccounts=JSON.parse(sa);
-}
-const su=localStorage.getItem('unreadCounts');
-if(su)unreadCounts=JSON.parse(su);
+    const su=localStorage.getItem('unreadCounts');
+    if(su)unreadCounts=JSON.parse(su);
+})();
 </script>
 </body>
     </html>
