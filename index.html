@@ -30,6 +30,7 @@ const firebaseConfig={apiKey:"AIzaSyAu_0afyO3C0imzjUPL4JXK17TWl9-y1K0",authDomai
 const app=initializeApp(firebaseConfig);
 const database=getDatabase(app);
 
+// ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
 let currentUser=null,chatsData={},unreadCounts={},currentReplyTo=null,currentOpenChat=null,onlineStatuses={},activityInterval=null,messagesListeners={},pressTimers=new Map();
 let ADMINS=['Чупик','чокопай'];
 let channelDescription='Официальный канал. Пишут только админы.';
@@ -37,6 +38,7 @@ let channelAvatar='⭐';
 const OFFICIAL_CHANNEL='Официальный канал';
 let savedAccounts=[];
 
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 function isAdmin(){return ADMINS.includes(currentUser);}
 function getChatRoomName(a,b){return[a,b].sort().join('___');}
 function formatMessageTime(){const n=new Date();return`${n.getHours().toString().padStart(2,'0')}:${n.getMinutes().toString().padStart(2,'0')}`;}
@@ -54,7 +56,7 @@ async function loadAllUsers(){const snap=await get(ref(database,'users'));const 
 async function initOfficialChannel(){const ch=await get(ref(database,'official_channel'));if(!ch.exists()){await set(ref(database,'official_channel'),{created:Date.now(),description:channelDescription,avatar:channelAvatar});}else{const desc=await get(ref(database,'official_channel/description'));if(desc.exists())channelDescription=desc.val();const av=await get(ref(database,'official_channel/avatar'));if(av.exists())channelAvatar=av.val();}}
 async function loadAdmins(){const a=await get(ref(database,'admins'));if(a.exists())ADMINS=a.val();else await set(ref(database,'admins'),ADMINS);}
 async function updateChannelDescription(newDesc){channelDescription=newDesc;await set(ref(database,'official_channel/description'),newDesc);if(currentOpenChat===OFFICIAL_CHANNEL)document.getElementById('channelDesc').textContent=channelDescription;}
-async function updateChannelAvatar(newAvatar){channelAvatar=newAvatar;await set(ref(database,'official_channel/avatar'),newAvatar);renderChatsList();if(currentOpenChat===OFFICIAL_CHANNEL){}}
+async function updateChannelAvatar(newAvatar){channelAvatar=newAvatar;await set(ref(database,'official_channel/avatar'),newAvatar);renderChatsList();}
 async function changeUserNickname(oldNick,newNick){if(oldNick===newNick)return;const ex=await get(ref(database,`users/${newNick}/nick`));if(ex.exists()){alert("Ник уже занят");return false;}const ud=await get(ref(database,`users/${oldNick}`));const data=ud.val();await set(ref(database,`users/${newNick}`),{nick:newNick,avatar:data.avatar||'👤',registered:data.registered});const pd=await get(ref(database,`passwords/${oldNick}`));await set(ref(database,`passwords/${newNick}`),pd.val());await set(ref(database,`users/${oldNick}`),null);await set(ref(database,`passwords/${oldNick}`),null);const oa=getUserAvatar(oldNick);if(oa)saveUserAvatar(newNick,oa);const ob=getUserBio(oldNick);if(ob)saveUserBio(newNick,ob);const nc={};for(const r in chatsData){if(r&&r.includes(oldNick))nc[r.replace(oldNick,newNick)]=chatsData[r];else if(r)nc[r]=chatsData[r];}chatsData=nc;localStorage.setItem('chats',JSON.stringify(chatsData));for(const or in chatsData){if(or&&or.includes(oldNick)){const nr=or.replace(oldNick,newNick),rd=await get(ref(database,`chats/${or}`));if(rd.exists()){await set(ref(database,`chats/${nr}`),rd.val());await set(ref(database,`chats/${or}`),null);}}}if(ADMINS.includes(oldNick)){const idx=ADMINS.indexOf(oldNick);if(idx!==-1)ADMINS[idx]=newNick;await set(ref(database,'admins'),ADMINS);}if(currentUser===oldNick){currentUser=newNick;localStorage.setItem('currentUser',currentUser);loadUserData();}renderChatsList();alert(`Ник изменён на ${newNick}`);return true;}
 async function resetUserPassword(nick,newPass){if(!newPass||newPass.length<4){alert("Пароль должен быть не менее 4 символов");return false;}await set(ref(database,`passwords/${nick}`),newPass);alert(`Пароль для ${nick} изменён`);return true;}
 async function updateUserDescription(nick,newDesc){if(ADMINS.includes(nick) && !isAdmin()){alert("Нельзя изменить описание админа");return false;}if(newDesc&&newDesc.trim())saveUserBio(nick,newDesc.trim());else saveUserBio(nick,'');alert(`Описание для ${nick} обновлено`);return true;}
@@ -118,20 +120,9 @@ function showChannelOptions(){
     modal.className='modal';
     modal.innerHTML=`<div class="modal-content"><h3>⚙️ Настройки канала</h3><div class="avatar-preview" id="channelAvatarPreview" style="background:linear-gradient(135deg,#e94560,#ff6b8b);display:flex;align-items:center;justify-content:center;font-size:48px;width:100px;height:100px;margin:0 auto 15px">${channelAvatar}</div><div class="avatar-select"><div class="avatar-option" data-avatar="⭐">⭐</div><div class="avatar-option" data-avatar="🔥">🔥</div><div class="avatar-option" data-avatar="💬">💬</div><div class="avatar-option" data-avatar="📢">📢</div><div class="avatar-option" data-avatar="👑">👑</div><div class="avatar-option" data-avatar="🎉">🎉</div><div class="avatar-option upload-avatar" id="uploadChannelAvatarBtn">📷</div></div><textarea id="channelDescInput" placeholder="Описание канала..." rows="3">${channelDescription}</textarea><div class="modal-buttons"><button id="saveChannelBtn">Сохранить</button><button id="closeChannelModal" class="secondary-btn">Закрыть</button></div></div>`;
     document.body.appendChild(modal);
-    
-    document.querySelectorAll('.avatar-option:not(#uploadChannelAvatarBtn)').forEach(opt=>{
-        opt.onclick=()=>{updateChannelAvatar(opt.dataset.avatar);document.getElementById('channelAvatarPreview').textContent=opt.dataset.avatar;};
-    });
-    document.getElementById('uploadChannelAvatarBtn').onclick=()=>{
-        const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
-        inp.onchange=e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=100;c.getContext('2d').drawImage(img,0,0,100,100);const url=c.toDataURL('image/jpeg',0.8);updateChannelAvatar(url);const pr=document.getElementById('channelAvatarPreview');pr.style.backgroundImage=`url(${url})`;pr.style.backgroundSize='cover';pr.textContent='';};img.src=ev.target.result;};r.readAsDataURL(f);}};inp.click();
-    };
-    document.getElementById('saveChannelBtn').onclick=()=>{
-        const newDesc=document.getElementById('channelDescInput').value.trim();
-        if(newDesc)updateChannelDescription(newDesc);
-        modal.remove();
-        alert('Настройки канала сохранены!');
-    };
+    document.querySelectorAll('.avatar-option:not(#uploadChannelAvatarBtn)').forEach(opt=>{opt.onclick=()=>{updateChannelAvatar(opt.dataset.avatar);document.getElementById('channelAvatarPreview').textContent=opt.dataset.avatar;};});
+    document.getElementById('uploadChannelAvatarBtn').onclick=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=100;c.getContext('2d').drawImage(img,0,0,100,100);const url=c.toDataURL('image/jpeg',0.8);updateChannelAvatar(url);const pr=document.getElementById('channelAvatarPreview');pr.style.backgroundImage=`url(${url})`;pr.style.backgroundSize='cover';pr.textContent='';};img.src=ev.target.result;};r.readAsDataURL(f);}};inp.click();};
+    document.getElementById('saveChannelBtn').onclick=()=>{const newDesc=document.getElementById('channelDescInput').value.trim();if(newDesc)updateChannelDescription(newDesc);modal.remove();alert('Настройки канала сохранены!');};
     document.getElementById('closeChannelModal').onclick=()=>modal.remove();
 }
 
@@ -154,10 +145,7 @@ async function showChannelMembers(){
                 btnEditBio.textContent='✏️ Описание';
                 btnEditBio.style.cssText='background:rgba(10,124,255,0.3);border:none;padding:5px 10px;border-radius:15px;color:#fff;margin-left:10px';
                 btnEditBio.onclick=async()=>{
-                    if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай'){
-                        alert("Нельзя изменить описание админа");
-                        return;
-                    }
+                    if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай'){alert("Нельзя изменить описание админа");return;}
                     const newBio=prompt(`Введите новое описание для ${u}:`,getUserBio(u));
                     if(newBio!==null)await updateUserDescription(u,newBio);
                     renderMembers();
@@ -166,30 +154,12 @@ async function showChannelMembers(){
                 const btnAdd=document.createElement('button');
                 btnAdd.textContent='👑 +Админ';
                 btnAdd.style.cssText='background:rgba(10,124,255,0.3);border:none;padding:5px 10px;border-radius:15px;color:#fff;margin-left:5px';
-                btnAdd.onclick=async()=>{
-                    if(!ADMINS.includes(u)){
-                        ADMINS.push(u);
-                        await set(ref(database,'admins'),ADMINS);
-                        alert(`${u} теперь админ!`);
-                        renderMembers();
-                        if(currentUser===u)loadUserData();
-                    }
-                };
+                btnAdd.onclick=async()=>{if(!ADMINS.includes(u)){ADMINS.push(u);await set(ref(database,'admins'),ADMINS);alert(`${u} теперь админ!`);renderMembers();if(currentUser===u)loadUserData();}};
                 const btnRemove=document.createElement('button');
                 btnRemove.textContent='➖ -Админ';
                 btnRemove.style.cssText='background:rgba(233,69,96,0.3);border:none;padding:5px 10px;border-radius:15px;color:#fff;margin-left:5px';
-                btnRemove.onclick=async()=>{
-                    if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай'){
-                        const idx=ADMINS.indexOf(u);
-                        if(idx!==-1)ADMINS.splice(idx,1);
-                        await set(ref(database,'admins'),ADMINS);
-                        alert(`${u} больше не админ`);
-                        renderMembers();
-                        if(currentUser===u)loadUserData();
-                    }
-                };
-                item.appendChild(btnAdd);
-                item.appendChild(btnRemove);
+                btnRemove.onclick=async()=>{if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай'){const idx=ADMINS.indexOf(u);if(idx!==-1)ADMINS.splice(idx,1);await set(ref(database,'admins'),ADMINS);alert(`${u} больше не админ`);renderMembers();if(currentUser===u)loadUserData();}};
+                item.appendChild(btnAdd);item.appendChild(btnRemove);
             }
             listDiv.appendChild(item);
         }
@@ -215,59 +185,10 @@ async function showAdminPanel(){
             const resetBtn=item.querySelector('[data-action="resetpass"]');
             const editBioBtn=item.querySelector('[data-action="editbio"]');
             const delBtn=item.querySelector('[data-action="delete"]');
-            renameBtn.onclick=async()=>{
-                const newNick=prompt(`Введите новый ник для ${u}:`,u);
-                if(newNick&&newNick.trim()&&newNick!==u){
-                    await changeUserNickname(u,newNick.trim());
-                    renderList();
-                    renderChatsList();
-                }
-            };
-            resetBtn.onclick=async()=>{
-                if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай' && !isAdmin()){
-                    alert("Нельзя сбросить пароль админа");
-                    return;
-                }
-                const newPass=prompt(`Введите новый пароль для ${u} (мин. 4 символа):`);
-                if(newPass&&newPass.length>=4)await resetUserPassword(u,newPass);
-                else if(newPass)alert("Пароль должен быть не менее 4 символов");
-            };
-            editBioBtn.onclick=async()=>{
-                if(ADMINS.includes(u) && !isAdmin()){
-                    alert("Нельзя изменить описание админа");
-                    return;
-                }
-                const newBio=prompt(`Введите новое описание для ${u}:`,getUserBio(u));
-                if(newBio!==null)await updateUserDescription(u,newBio);
-            };
-            delBtn.onclick=async()=>{
-                if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай' && !isAdmin()){
-                    alert("Нельзя удалить админа");
-                    return;
-                }
-                if(confirm(`Удалить аккаунт ${u}? Все его чаты и сообщения будут удалены!`)){
-                    await remove(ref(database,`users/${u}`));
-                    await remove(ref(database,`passwords/${u}`));
-                    const rooms=Object.keys(chatsData);
-                    for(const r of rooms){if(r.includes(u)){await set(ref(database,`chats/${r}`),null);delete chatsData[r];}}
-                    if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай'){
-                        const idx=ADMINS.indexOf(u);
-                        if(idx!==-1)ADMINS.splice(idx,1);
-                        await set(ref(database,'admins'),ADMINS);
-                    }
-                    localStorage.setItem('chats',JSON.stringify(chatsData));
-                    alert(`Аккаунт ${u} удалён`);
-                    renderList();
-                    renderChatsList();
-                    if(currentUser===u){
-                        localStorage.removeItem('currentUser');
-                        currentUser=null;
-                        document.getElementById('chatsScreen').style.display='none';
-                        document.getElementById('loginScreen').style.display='flex';
-                        modal.remove();
-                    }
-                }
-            };
+            renameBtn.onclick=async()=>{const newNick=prompt(`Введите новый ник для ${u}:`,u);if(newNick&&newNick.trim()&&newNick!==u){await changeUserNickname(u,newNick.trim());renderList();renderChatsList();}};
+            resetBtn.onclick=async()=>{if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай' && !isAdmin()){alert("Нельзя сбросить пароль админа");return;}const newPass=prompt(`Введите новый пароль для ${u} (мин. 4 символа):`);if(newPass&&newPass.length>=4)await resetUserPassword(u,newPass);else if(newPass)alert("Пароль должен быть не менее 4 символов");};
+            editBioBtn.onclick=async()=>{if(ADMINS.includes(u) && !isAdmin()){alert("Нельзя изменить описание админа");return;}const newBio=prompt(`Введите новое описание для ${u}:`,getUserBio(u));if(newBio!==null)await updateUserDescription(u,newBio);};
+            delBtn.onclick=async()=>{if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай' && !isAdmin()){alert("Нельзя удалить админа");return;}if(confirm(`Удалить аккаунт ${u}? Все его чаты и сообщения будут удалены!`)){await remove(ref(database,`users/${u}`));await remove(ref(database,`passwords/${u}`));const rooms=Object.keys(chatsData);for(const r of rooms){if(r.includes(u)){await set(ref(database,`chats/${r}`),null);delete chatsData[r];}}if(ADMINS.includes(u) && u!=='Чупик' && u!=='чокопай'){const idx=ADMINS.indexOf(u);if(idx!==-1)ADMINS.splice(idx,1);await set(ref(database,'admins'),ADMINS);}localStorage.setItem('chats',JSON.stringify(chatsData));alert(`Аккаунт ${u} удалён`);renderList();renderChatsList();if(currentUser===u){localStorage.removeItem('currentUser');currentUser=null;document.getElementById('chatsScreen').style.display='none';document.getElementById('loginScreen').style.display='flex';modal.remove();}}};
             listDiv.appendChild(item);
         }
     }
@@ -282,28 +203,9 @@ function renderOfficialMessages(){
     c.innerHTML='';
     if(messagesListeners.official){messagesListeners.official();delete messagesListeners.official;}
     const mref=query(ref(database,'official_channel/messages'),limitToLast(100));
-    const unsub=onChildAdded(mref,(snap)=>{
-        const msg=snap.val();
-        if(!msg)return;
-        const isMine=msg.sender===currentUser,w=document.createElement('div');
-        w.className=`message-wrapper ${isMine?'message-mine-wrapper':'message-theirs-wrapper'}`;
-        let clean=msg.text||'',reply='',sep=' ||| ответ на: ';
-        if(clean&&clean.includes(sep)){const p=clean.split(sep);clean=p[0];const qm=p[1].match(/@([^|]+)\|(.+)/);if(qm)reply=`<div class="reply-quote">↪️ ответ @${qm[1]}: ${qm[2].substring(0,40)}${qm[2].length>40?'...':''}</div>`;}
-        const md=document.createElement('div');
-        md.className=`message ${isMine?'message-mine':'message-theirs'}`;
-        md.innerHTML=reply+(clean||msg.text||'');
-        const ts=document.createElement('div');
-        ts.className='message-time';
-        ts.textContent=msg.timeStr||formatMessageTime();
-        w.appendChild(md);
-        w.appendChild(ts);
-        c.appendChild(w);
-        const mc=document.getElementById('messagesContainer');
-        if(mc)mc.scrollTop=mc.scrollHeight;
-    });
+    const unsub=onChildAdded(mref,(snap)=>{const msg=snap.val();if(!msg)return;const isMine=msg.sender===currentUser,w=document.createElement('div');w.className=`message-wrapper ${isMine?'message-mine-wrapper':'message-theirs-wrapper'}`;let clean=msg.text||'',reply='',sep=' ||| ответ на: ';if(clean&&clean.includes(sep)){const p=clean.split(sep);clean=p[0];const qm=p[1].match(/@([^|]+)\|(.+)/);if(qm)reply=`<div class="reply-quote">↪️ ответ @${qm[1]}: ${qm[2].substring(0,40)}${qm[2].length>40?'...':''}</div>`;}const md=document.createElement('div');md.className=`message ${isMine?'message-mine':'message-theirs'}`;md.innerHTML=reply+(clean||msg.text||'');const ts=document.createElement('div');ts.className='message-time';ts.textContent=msg.timeStr||formatMessageTime();w.appendChild(md);w.appendChild(ts);c.appendChild(w);const mc=document.getElementById('messagesContainer');if(mc)mc.scrollTop=mc.scrollHeight;});
     messagesListeners.official=()=>{unsub();delete messagesListeners.official;};
 }
-
 async function sendOfficialMessage(t){if(!t||!isAdmin())return;await push(ref(database,'official_channel/messages'),{text:t,sender:currentUser,timestamp:Date.now(),timeStr:formatMessageTime()});}
 
 function openChat(w){
@@ -317,14 +219,7 @@ function openChat(w){
     document.getElementById('messengerScreen').style.display='flex';
     document.getElementById('inputWrapper').style.display='block';
     updateChatHeaderStatus(w);
-    document.getElementById('chatWith').onclick=async()=>{
-        const other=w,avatar=getUserAvatar(other),isImg=avatar&&avatar.startsWith('data:image'),bio=getUserBio(other),last=await getLastSeen(other),lastText=formatLastSeen(last);
-        const modal=document.createElement('div');
-        modal.className='modal';
-        modal.innerHTML=`<div class="modal-content"><h3>👤 Профиль</h3><div class="avatar-preview" style="${isImg?`background-image:url(${avatar});background-size:cover;background-position:center;font-size:0`:''}">${isImg?'':avatar}</div><p style="color:white;text-align:center;margin:15px 0 5px">${other}</p>${bio?`<p style="color:rgba(255,255,255,0.4);text-align:center;font-size:13px;margin-bottom:10px">📝 ${bio}</p>`:''}<p style="color:rgba(255,255,255,0.3);text-align:center;font-size:12px">🕐 Был(а): ${lastText}</p><div class="modal-buttons"><button id="closeProfileModal" class="secondary-btn">Закрыть</button></div></div>`;
-        document.body.appendChild(modal);
-        document.getElementById('closeProfileModal').onclick=()=>modal.remove();
-    };
+    document.getElementById('chatWith').onclick=async()=>{const other=w,avatar=getUserAvatar(other),isImg=avatar&&avatar.startsWith('data:image'),bio=getUserBio(other),last=await getLastSeen(other),lastText=formatLastSeen(last);const modal=document.createElement('div');modal.className='modal';modal.innerHTML=`<div class="modal-content"><h3>👤 Профиль</h3><div class="avatar-preview" style="${isImg?`background-image:url(${avatar});background-size:cover;background-position:center;font-size:0`:''}">${isImg?'':avatar}</div><p style="color:white;text-align:center;margin:15px 0 5px">${other}</p>${bio?`<p style="color:rgba(255,255,255,0.4);text-align:center;font-size:13px;margin-bottom:10px">📝 ${bio}</p>`:''}<p style="color:rgba(255,255,255,0.3);text-align:center;font-size:12px">🕐 Был(а): ${lastText}</p><div class="modal-buttons"><button id="closeProfileModal" class="secondary-btn">Закрыть</button></div></div>`;document.body.appendChild(modal);document.getElementById('closeProfileModal').onclick=()=>modal.remove();};
 }
 
 function renderMessages(){
@@ -334,34 +229,12 @@ function renderMessages(){
     const rn=getChatRoomName(currentUser,currentOpenChat);
     if(messagesListeners[rn]){messagesListeners[rn]();delete messagesListeners[rn];}
     const mref=query(ref(database,`chats/${rn}/messages`),limitToLast(50));
-    const unsub=onChildAdded(mref,(snap)=>{
-        const msg=snap.val();
-        if(!msg)return;
-        const isMine=msg.sender===currentUser,w=document.createElement('div');
-        w.className=`message-wrapper ${isMine?'message-mine-wrapper':'message-theirs-wrapper'}`;
-        let clean=msg.text||'',reply='',sep=' ||| ответ на: ';
-        if(clean&&clean.includes(sep)){const p=clean.split(sep);clean=p[0];const qm=p[1].match(/@([^|]+)\|(.+)/);if(qm)reply=`<div class="reply-quote">↪️ ответ @${qm[1]}: ${qm[2].substring(0,40)}${qm[2].length>40?'...':''}</div>`;}
-        const md=document.createElement('div');
-        md.className=`message ${isMine?'message-mine':'message-theirs'}`;
-        md.innerHTML=reply+(clean||msg.text||'');
-        const ts=document.createElement('div');
-        ts.className='message-time';
-        ts.textContent=msg.timeStr||formatMessageTime();
-        w.appendChild(md);
-        w.appendChild(ts);
-        c.appendChild(w);
-        const mc=document.getElementById('messagesContainer');
-        if(mc)mc.scrollTop=mc.scrollHeight;
-        if(!isMine&&currentOpenChat!==msg.sender){const rn2=getChatRoomName(currentUser,msg.sender);unreadCounts[rn2]=(unreadCounts[rn2]||0)+1;localStorage.setItem('unreadCounts',JSON.stringify(unreadCounts));renderChatsList();}
-    });
+    const unsub=onChildAdded(mref,(snap)=>{const msg=snap.val();if(!msg)return;const isMine=msg.sender===currentUser,w=document.createElement('div');w.className=`message-wrapper ${isMine?'message-mine-wrapper':'message-theirs-wrapper'}`;let clean=msg.text||'',reply='',sep=' ||| ответ на: ';if(clean&&clean.includes(sep)){const p=clean.split(sep);clean=p[0];const qm=p[1].match(/@([^|]+)\|(.+)/);if(qm)reply=`<div class="reply-quote">↪️ ответ @${qm[1]}: ${qm[2].substring(0,40)}${qm[2].length>40?'...':''}</div>`;}const md=document.createElement('div');md.className=`message ${isMine?'message-mine':'message-theirs'}`;md.innerHTML=reply+(clean||msg.text||'');const ts=document.createElement('div');ts.className='message-time';ts.textContent=msg.timeStr||formatMessageTime();w.appendChild(md);w.appendChild(ts);c.appendChild(w);const mc=document.getElementById('messagesContainer');if(mc)mc.scrollTop=mc.scrollHeight;if(!isMine&&currentOpenChat!==msg.sender){const rn2=getChatRoomName(currentUser,msg.sender);unreadCounts[rn2]=(unreadCounts[rn2]||0)+1;localStorage.setItem('unreadCounts',JSON.stringify(unreadCounts));renderChatsList();}});
     messagesListeners[rn]=()=>{unsub();delete messagesListeners[rn];};
 }
-
 async function sendMessage(t){if(!t||!currentOpenChat||currentOpenChat===OFFICIAL_CHANNEL)return;const rn=getChatRoomName(currentUser,currentOpenChat);let ft=t;if(currentReplyTo){ft=t+' ||| ответ на: @'+currentReplyTo.sender+'|'+currentReplyTo.text;currentReplyTo=null;document.getElementById('replyPreview').style.display='none';}await push(ref(database,`chats/${rn}/messages`),{text:ft,sender:currentUser,timestamp:Date.now(),timeStr:formatMessageTime()});}
-
 function attachContextMenuToMessage(w,key,sender,text,isMine,room){if(pressTimers.has(w)){clearTimeout(pressTimers.get(w));pressTimers.delete(w);}let timer;const start=(e)=>{timer=setTimeout(()=>{showContextMenu(e.touches[0].clientX,e.touches[0].clientY,key,sender,text,isMine,w,room);},500);pressTimers.set(w,timer);};const clear=()=>{if(timer)clearTimeout(timer);pressTimers.delete(w);};w.addEventListener('touchstart',start);w.addEventListener('touchend',clear);w.addEventListener('touchmove',clear);}
 function showContextMenu(x,y,key,sender,text,isMine,wrapper,room){const ex=document.querySelector('.context-menu');if(ex)ex.remove();const menu=document.createElement('div');menu.className='context-menu';const rect=wrapper.getBoundingClientRect(),sw=window.innerWidth;if(isMine){let lp=rect.left-150;if(lp<10)lp=rect.left+10;menu.style.left=lp+'px';menu.style.top=(rect.top+20)+'px';}else{let rp=sw-rect.right+10;if(rp<10)rp=sw-rect.left-160;menu.style.right=rp+'px';menu.style.top=(rect.top+20)+'px';}const reply=document.createElement('div');reply.className='context-menu-item';reply.innerHTML='💬 Ответить';reply.onclick=()=>{currentReplyTo={sender,text};document.getElementById('replyPreview').style.display='flex';document.getElementById('replyToText').textContent=`${sender}: ${text?text.substring(0,40):''}...`;menu.remove();};menu.appendChild(reply);if(isMine){const del=document.createElement('div');del.className='context-menu-item context-menu-delete';del.innerHTML='🗑 Удалить';del.onclick=async()=>{if(confirm('Удалить сообщение?')){await remove(ref(database,`chats/${room}/messages/${key}`));}};menu.appendChild(del);}document.body.appendChild(menu);setTimeout(()=>{const ch=(e)=>{if(!menu.contains(e.target)){menu.remove();document.removeEventListener('click',ch);}};document.addEventListener('click',ch);},10);}
-
 async function loadChatsFromFirebase(){return new Promise(r=>{onValue(ref(database,'chats'),snap=>{chatsData=snap.val()||{};localStorage.setItem('chats',JSON.stringify(chatsData));renderChatsList();r();});});}
 function loadOnlineStatuses(){onValue(ref(database,'users'),snap=>{const d=snap.val()||{};onlineStatuses={};for(const k in d)if(d[k]&&d[k].online)onlineStatuses[k]=d[k].online;renderChatsList();if(currentOpenChat&&currentOpenChat!==OFFICIAL_CHANNEL)updateChatHeaderStatus(currentOpenChat);});}
 function updateChatHeaderStatus(w){const isOn=isUserOnline(w),sd=document.getElementById('chatHeaderStatus');if(sd){sd.textContent=isOn?'🟢 Онлайн':'⚫ Офлайн';sd.className='chat-header-status '+(isOn?'online':'offline');}}
@@ -371,6 +244,7 @@ function showAddAccountModal(){const m=document.createElement('div');m.className
 function renderAccountsList(){const c=document.getElementById('accountsList');if(!c)return;c.innerHTML='<div style="padding:8px 15px;color:rgba(255,255,255,0.5);font-size:11px">📱 Аккаунты</div>';for(const a of savedAccounts){const d=document.createElement('div');d.className='account-item';const av=getUserAvatar(a),isImg=av&&av.startsWith('data:image');d.innerHTML=`<div class="account-avatar" style="${isImg?`background-image:url(${av});background-size:cover;background-position:center` : ''}">${isImg?'':av}</div><div class="account-name">${a}</div>${currentUser===a?'<span class="current-badge">текущий</span>':''}`;d.onclick=()=>{if(currentUser!==a&&confirm(`Переключиться на ${a}?`))switchAccount(a)};c.appendChild(d)}const ad=document.createElement('div');ad.className='account-item';ad.innerHTML='<div class="account-avatar">➕</div><div class="account-name">Добавить аккаунт</div>';ad.onclick=()=>{closeMenu();showAddAccountModal()};c.appendChild(ad)}
 async function switchAccount(n){if(messagesListeners[currentOpenChat]){messagesListeners[currentOpenChat]();delete messagesListeners[currentOpenChat]}currentUser=n;localStorage.setItem('currentUser',currentUser);loadUserData();await loadChatsFromFirebase();renderChatsList();renderAccountsList();if(currentOpenChat){document.getElementById('messengerScreen').style.display='none';document.getElementById('chatsScreen').style.display='flex';currentOpenChat=null}await updateOnlineStatus();}
 
+// ========== ОБРАБОТЧИКИ СОБЫТИЙ ==========
 document.getElementById('registerBtn').onclick=async()=>{const n=document.getElementById('regNick').value.trim(),p=document.getElementById('regPass').value;if(!n||!p){alert("Заполни все поля");return;}const ex=await get(ref(database,`users/${n}/nick`));if(ex.exists()){alert("Никнейм уже занят");return;}await set(ref(database,`users/${n}`),{nick:n,avatar:getUserAvatar(n)||'👤',registered:Date.now()});await set(ref(database,`passwords/${n}`),p);alert("Регистрация успешна! Теперь войдите.");document.getElementById('registerScreen').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('regNick').value='';document.getElementById('regPass').value='';};
 document.getElementById('loginBtn').onclick=async()=>{const n=document.getElementById('loginNick').value.trim(),p=document.getElementById('loginPass').value;if(!n||!p){alert("Заполни поля");return;}const us=await get(ref(database,`users/${n}/nick`));if(!us.exists()){alert("Пользователь не найден");return;}const ps=await get(ref(database,`passwords/${n}`));if(ps.val()!==p){alert("Неверный пароль");return;}currentUser=n;localStorage.setItem('currentUser',currentUser);await updateOnlineStatus();trackActivity();document.getElementById('loginScreen').style.display='none';document.getElementById('chatsScreen').style.display='flex';document.getElementById('loginNick').value='';document.getElementById('loginPass').value='';loadUserData();await loadChatsFromFirebase();loadOnlineStatuses();await loadAdmins();await initOfficialChannel();const sa=localStorage.getItem('savedAccounts');if(sa)savedAccounts=JSON.parse(sa);else savedAccounts=[currentUser];renderAccountsList();};
 document.getElementById('showRegisterBtn').onclick=()=>{document.getElementById('loginScreen').style.display='none';document.getElementById('registerScreen').style.display='flex';};
@@ -394,6 +268,7 @@ document.getElementById('searchMessagesInput').oninput=(e)=>{const q=e.target.va
 document.getElementById('closeSearchMessagesBtn').onclick=()=>{document.getElementById('searchMessagesPanel').style.display='none';document.getElementById('searchMessagesInput').value='';if(currentOpenChat===OFFICIAL_CHANNEL)renderOfficialMessages();else renderMessages();};
 document.getElementById('cancelReplyBtn').onclick=()=>{currentReplyTo=null;document.getElementById('replyPreview').style.display='none';};
 
+// ========== ИНИЦИАЛИЗАЦИЯ (ГАРАНТИРОВАННО РАБОТАЕТ) ==========
 (async function init(){
     await loadAdmins();
     const savedUser=localStorage.getItem('currentUser');
@@ -425,4 +300,4 @@ document.getElementById('cancelReplyBtn').onclick=()=>{currentReplyTo=null;docum
 })();
 </script>
 </body>
-    </html>
+</html>
